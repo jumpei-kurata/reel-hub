@@ -15,7 +15,6 @@ _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 class FacebookPostRequest(BaseModel):
     video_id: str
     message: str
-    published: bool = True
 
 
 @router.post("/facebook/post")
@@ -26,7 +25,7 @@ async def post_to_facebook(req: FacebookPostRequest):
         raise HTTPException(status_code=400, detail="Invalid video ID")
     try:
         path = get_video_path(req.video_id)
-        return await post_video(path, req.message, req.published)
+        return await post_video(path, req.message)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="動画が見つかりません")
     except Exception as e:

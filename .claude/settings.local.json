@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__voicevox__speak",
+      "Bash(gh repo *)",
+      "Bash(git *)",
+      "Bash(uv run *)",
+      "Bash(curl -s http://localhost:8000/ping)",
+      "WebFetch(domain:reel-hub.onrender.com)",
+      "Bash(xargs kill *)",
+      "Bash(pkill -f \"uvicorn\")"
+    ]
+  }
+}
