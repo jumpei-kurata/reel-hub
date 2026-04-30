@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 router = APIRouter()
 
@@ -25,6 +25,11 @@ _PRIVACY_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><t
 <h2>Facebookとの連携</h2><p>Facebook APIを通じて取得するデータは、ページへのコンテンツ投稿のみに使用します。</p>
 <h2>データの保管</h2><p>一時的にダウンロードした動画ファイルはサーバー再起動時に削除されます。</p>
 <p>最終更新日: 2024年1月</p></body></html>"""
+
+
+@router.get("/tiktokUoIBAU2M3OKbXL0V3Hhx95CPTkjwzQpA.txt", response_class=PlainTextResponse)
+async def tiktok_verify():
+    return "tiktok-developers-site-verification=UolBAU2M3OKbXL0V3Hhx95CPTkjwzQpA"
 
 
 @router.get("/terms", response_class=HTMLResponse)
