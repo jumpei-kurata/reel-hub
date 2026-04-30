@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Reel Hub</title>
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --card: #1a1a1a;
+      --border: #2a2a2a;
+      --primary: #6c5ce7;
+      --text: #ffffff;
+      --sub: #888888;
+      --success: #00b894;
+      --error: #e17055;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      padding-bottom: calc(64px + var(--safe-bottom));
+    }
+    header {
+      position: sticky; top: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      padding-top: calc(14px + var(--safe-top));
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 100;
+    }
+    .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .indicators { display: flex; gap: 12px; align-items: center; }
+    .indicator { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--sub); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+    .dot.on { background: var(--success); }
+    main { padding: 16px; max-width: 480px; margin: 0 auto; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+    label { display: block; font-size: 11px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+    input[type=url], textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-size: 16px; padding: 13px 14px; outline: none;
+      transition: border-color .2s; -webkit-appearance: none; font-family: inherit;
+    }
+    input[type=url]:focus, textarea:focus { border-color: var(--primary); }
+    textarea { min-height: 90px; resize: vertical; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 15px; border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s, transform .1s; -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.97); opacity: 0.9; }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+    .btn-primary { background: var(--primary); color: #fff; margin-top: 12px; }
+    .btn-save   { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    .btn-tt     { background: #111; color: #fff; border: 1px solid var(--border); }
+    .btn-fb     { background: #1877f2; color: #fff; }
+    .btn-fb-draft { background: transparent; color: #1877f2; border: 1px solid #1877f2; }
+    .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    video { width: 100%; border-radius: 10px; max-height: 380px; background: #000; display: block; }
+    .hidden { display: none !important; }
+    footer {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--card); border-top: 1px solid var(--border);
+      padding: 12px 20px; padding-bottom: calc(12px + var(--safe-bottom));
+      text-align: center; font-size: 13px; color: var(--sub); z-index: 100;
+      transition: color .3s;
+    }
+    footer.loading { color: var(--primary); }
+    footer.error   { color: var(--error); }
+    footer.success { color: var(--success); }
+    .spin {
+      display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-right: 5px;
+      border: 2px solid rgba(108,92,231,.3); border-top-color: var(--primary);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">🎬 Reel Hub</div>
+  <div class="indicators">
+    <div class="indicator"><span class="dot" id="dot-tt"></span>TikTok</div>
+    <div class="indicator"><span class="dot" id="dot-fb"></span>Facebook</div>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <label>Instagram URL</label>
+    <input type="url" id="url" placeholder="https://www.instagram.com/reel/..."
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <button class="btn btn-primary" id="btn-dl" onclick="startDownload()">ダウンロード</button>
+  </div>
+
+  <div id="section-result" class="hidden">
+    <div class="card">
+      <label>プレビュー</label>
+      <video id="preview" controls playsinline></video>
+    </div>
+
+    <div class="card">
+      <label>キャプション / ハッシュタグ</label>
+      <textarea id="caption">#ダンス #ブレイクダンス #dance #breakdance #</textarea>
+      <div class="actions">
+        <button class="btn btn-save" onclick="saveToDevice()">📱 カメラロールに保存</button>
+        <p style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">Safariで開けない場合は動画を長押し→「ビデオを保存」</p>
+        <button class="btn btn-tt" id="btn-tt" onclick="postTikTok()">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.34 6.34 0 1 0 5.54 6.29V8.78a8.18 8.18 0 0 0 4.78 1.52V6.85a4.85 4.85 0 0 1-1.01-.16z"/>
+          </svg>
+          TikTokに投稿
+        </button>
+        <button class="btn btn-fb" id="btn-fb" onclick="postFacebook(true)">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+          Facebookに投稿
+        </button>
+        <button class="btn btn-fb-draft" id="btn-fb-draft" onclick="postFacebook(false)">
+          Facebookに下書き保存
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer id="status">準備完了</footer>
+
+<script>
+  let videoId = null;
+
+  async function checkStatus() {
+    try {
+      const d = await fetch('/auth/status').then(r => r.json());
+      document.getElementById('dot-tt').classList.toggle('on', d.tiktok_configured);
+      document.getElementById('dot-fb').classList.toggle('on', d.facebook_configured);
+      document.getElementById('btn-tt').disabled = !d.tiktok_configured;
+      document.getElementById('btn-fb').disabled = !d.facebook_configured;
+      document.getElementById('btn-fb-draft').disabled = !d.facebook_configured;
+    } catch {}
+  }
+
+  function setStatus(msg, type = '') {
+    const el = document.getElementById('status');
+    el.className = type;
+    el.innerHTML = type === 'loading' ? `<span class="spin"></span>${msg}` : msg;
+  }
+
+  async function startDownload() {
+    const url = document.getElementById('url').value.trim();
+    if (!url) { setStatus('URLを入力してください', 'error'); return; }
+    document.getElementById('btn-dl').disabled = true;
+    setStatus('ダウンロード中...', 'loading');
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail);
+      const data = await res.json();
+      videoId = data.video_id;
+      const vid = document.getElementById('preview');
+      vid.src = `/api/video/${videoId}`;
+      document.getElementById('section-result').classList.remove('hidden');
+      document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
+      setStatus('ダウンロード完了 ✓', 'success');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    } finally {
+      document.getElementById('btn-dl').disabled = false;
+    }
+  }
+
+  function saveToDevice() {
+    if (!videoId) return;
+    const a = document.createElement('a');
+    a.href = `/api/video/${videoId}?download=true`;
+    a.download = 'video.mp4';
+    a.click();
+  }
+
+  async function postTikTok() {
+    if (!videoId) return;
+    const caption = document.getElementById('caption').value;
+    document.getElementById('btn-tt').disabled = true;
+    setStatus('TikTokにアップロード中...', 'loading');
+    try {
+      const res = await fetch('/api/tiktok/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId, caption }),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail);
+      setStatus('TikTokに投稿しました ✓', 'success');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    } finally {
+      document.getElementById('btn-tt').disabled = false;
+    }
+  }
+
+  async function postFacebook(published) {
+    if (!videoId) return;
+    const message = document.getElementById('caption').value;
+    const label = published ? 'Facebookに投稿中...' : '下書き保存中...';
+    setStatus(label, 'loading');
+    try {
+      const res = await fetch('/api/facebook/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId, message, published }),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail);
+      setStatus(published ? 'Facebookに投稿しました ✓' : '下書きを保存しました ✓', 'success');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  }
+
+  document.getElementById('url').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startDownload();
+  });
+
+  checkStatus();
+</script>
+</body>
+</html>
