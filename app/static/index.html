@@ -110,7 +110,7 @@
 
     <div class="card">
       <label>キャプション / ハッシュタグ</label>
-      <textarea id="caption">#ダンス #ブレイクダンス #dance #breakdance #</textarea>
+      <textarea id="caption"></textarea>
       <div class="actions">
         <button class="btn btn-save" onclick="saveToDevice()">📱 カメラロールに保存</button>
         <p style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">Safariで開けない場合は動画を長押し→「ビデオを保存」</p>
@@ -227,6 +227,9 @@
       setStatus(e.message, 'error');
     }
   }
+
+  const DEFAULT_CAPTION = '\n\n#ダンス #ブレイクダンス #dance #breakdance #';
+  document.getElementById('caption').value = DEFAULT_CAPTION;
 
   document.getElementById('url').addEventListener('keydown', e => {
     if (e.key === 'Enter') startDownload();
