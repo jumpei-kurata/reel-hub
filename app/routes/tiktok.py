@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import secrets
@@ -13,9 +14,30 @@ from app.services.tiktok import exchange_code_for_tokens, post_video
 router = APIRouter()
 
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_TOKEN_FILE = "/tmp/reel-hub/tiktok_tokens.json"
 
-# In-memory token store (seeded from env on startup)
+
+def _load_tokens() -> tuple[str, str]:
+    try:
+        with open(_TOKEN_FILE) as f:
+            d = json.load(f)
+            return d.get("access_token", ""), d.get("refresh_token", "")
+    except Exception:
+        return "", ""
+
+
+def _save_tokens(access_token: str, refresh_token: str) -> None:
+    os.makedirs(os.path.dirname(_TOKEN_FILE), exist_ok=True)
+    with open(_TOKEN_FILE, "w") as f:
+        json.dump({"access_token": access_token, "refresh_token": refresh_token}, f)
+
+
+# Seed from env, then try file
 _access_token = TIKTOK_ACCESS_TOKEN
+_refresh_token = ""
+if not _access_token:
+    _access_token, _refresh_token = _load_tokens()
+
 _pending_states: set[str] = set()
 
 
@@ -59,7 +81,7 @@ async def tiktok_auth():
 
 @router.get("/auth/tiktok/callback")
 async def tiktok_callback(code: str, state: str):
-    global _access_token
+    global _access_token, _refresh_token
     if state not in _pending_states:
         raise HTTPException(status_code=400, detail="Invalid state")
     _pending_states.discard(state)
@@ -67,7 +89,9 @@ async def tiktok_callback(code: str, state: str):
     redirect_uri = f"{APP_BASE_URL}/auth/tiktok/callback"
     data = await exchange_code_for_tokens(code, redirect_uri, TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET)
     _access_token = data.get("access_token", "")
-    refresh_token = data.get("refresh_token", "")
+    _refresh_token = data.get("refresh_token", "")
+
+    _save_tokens(_access_token, _refresh_token)
 
     return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8">
@@ -75,13 +99,11 @@ async def tiktok_callback(code: str, state: str):
 <style>
   body{{font-family:-apple-system,sans-serif;background:#0d0d0d;color:#fff;padding:24px;max-width:500px;margin:0 auto}}
   h2{{color:#00b894;margin-bottom:16px}}
-  pre{{background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:12px;font-size:12px;overflow-x:auto;word-break:break-all;white-space:pre-wrap}}
+  p{{color:#aaa;font-size:14px}}
   a{{color:#6c5ce7;display:inline-block;margin-top:20px;font-size:16px}}
 </style></head><body>
 <h2>✅ TikTok認証完了</h2>
-<p>Renderの環境変数に以下を設定してください:</p>
-<pre>TIKTOK_ACCESS_TOKEN={_access_token}
-TIKTOK_REFRESH_TOKEN={refresh_token}</pre>
+<p>トークンを保存しました。再起動後も自動的に復元されます。</p>
 <a href="/">← ホームへ戻る</a>
 </body></html>""")
 
