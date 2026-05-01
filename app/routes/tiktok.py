@@ -134,4 +134,5 @@ async def auth_status():
     return {
         "facebook_configured": bool(os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")),
         "tiktok_configured": bool(_access_token),
+        "instagram_configured": bool(os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")),
     }

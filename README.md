@@ -1,14 +1,22 @@
 # Reel Hub
 
-Instagramの動画をダウンロードして、TikTok・Facebookページに投稿するプライベートツール。
+Instagramの動画をダウンロードして、Facebookページ・Instagramに投稿するプライベートツール。
 
 ## 機能
 
-- Instagram URLから動画をダウンロード
-- iPhoneカメラロールへ保存
-- Facebookページへ即時投稿
-- TikTokへ投稿
+- Instagram URLから動画をダウンロード → Facebookに投稿 & カメラロールに保存
+- ローカル動画ファイルをアップロード → Facebook & Instagramに自動投稿
 - キャプション・ハッシュタグを毎回編集可能（デフォルト: `#ダンス #ブレイクダンス #dance #breakdance #`）
+
+## 現在の状態（2026-05-01）
+
+| 機能 | 状態 |
+|------|------|
+| Instagram URLダウンロード | ✅ 動作中 |
+| Facebook自動投稿 | ✅ 動作中 |
+| カメラロール保存（iOS Web Share API） | ✅ 動作中 |
+| Instagramへの自動投稿 | ⚠️ コード実装済み・環境変数未設定（後日作業） |
+| TikTok投稿 | ❌ 廃止（ポリシー違反・Sandbox非公開制限のため） |
 
 ## 技術構成
 
@@ -59,10 +67,42 @@ Renderの Environment Variables に以下を設定する。
 |-----|------|
 | `APP_BASE_URL` | `https://reel-hub.onrender.com` |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | 無期限ページアクセストークン（取得方法は後述） |
-| `TIKTOK_CLIENT_KEY` | TikTok Developer AppのClient Key |
-| `TIKTOK_CLIENT_SECRET` | TikTok Developer AppのClient Secret |
-| `TIKTOK_ACCESS_TOKEN` | `/auth/tiktok` で認証後に取得 |
-| `TIKTOK_REFRESH_TOKEN` | 同上 |
+| `INSTAGRAM_BUSINESS_ACCOUNT_ID` | InstagramビジネスアカウントID（取得方法は後述・**未設定**） |
+
+---
+
+## Instagram自動投稿セットアップ（⚠️ 後日作業）
+
+> コードは実装済み。以下の手順を完了すれば動作する。
+
+### 作業ステータス
+
+- [x] バックエンド実装（`app/services/instagram.py`, `app/routes/instagram.py`）
+- [x] フロントエンド実装（アップロード時のみ自動投稿ボタンに切り替わる）
+- [ ] Meta AppにInstagram権限を追加
+- [ ] InstagramビジネスアカウントIDを取得してRenderに設定
+
+### 1. Meta AppにInstagram権限を追加
+
+1. [developers.facebook.com](https://developers.facebook.com) → reel-hub → ユースケース
+2. 「Instagramグラフ API」を追加
+3. 権限に `instagram_content_publish`、`instagram_basic` を追加
+
+> **注意**: アプリレビューが必要になる可能性あり。開発モードのままなら自分のアカウントにのみ投稿可能。
+
+### 2. INSTAGRAM_BUSINESS_ACCOUNT_IDを取得
+
+グラフAPIエクスプローラーで以下を実行（`FACEBOOK_PAGE_ACCESS_TOKEN`が必要）：
+
+```
+GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
+```
+
+レスポンスの `instagram_business_account.id` の値をコピー。
+
+### 3. Renderに環境変数を設定
+
+`INSTAGRAM_BUSINESS_ACCOUNT_ID` に取得したIDを設定 → Redeploy。
 
 ---
 

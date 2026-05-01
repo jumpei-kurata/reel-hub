@@ -37,6 +37,7 @@
       z-index: 100;
     }
     .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .indicators { display: flex; gap: 12px; align-items: center; }
     .indicator { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--sub); }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
     .dot.on { background: var(--success); }
@@ -93,7 +94,10 @@
 <body>
 <header>
   <div class="logo">🎬 Reel Hub</div>
-  <div class="indicator"><span class="dot" id="dot-fb"></span>Facebook</div>
+  <div class="indicators">
+    <div class="indicator"><span class="dot" id="dot-fb"></span>Facebook</div>
+    <div class="indicator"><span class="dot" id="dot-ig"></span>Instagram</div>
+  </div>
 </header>
 
 <main>
@@ -131,12 +135,9 @@
       <textarea id="caption"></textarea>
       <div class="actions">
         <button class="btn btn-post" id="btn-post" onclick="postAndSave()">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
           Facebookに投稿 & カメラロールに保存
         </button>
-        <p style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">共有シートが開いたら「ビデオを保存」をタップ</p>
+        <p id="post-hint" style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">共有シートが開いたら「ビデオを保存」をタップ</p>
       </div>
     </div>
   </div>
@@ -146,12 +147,28 @@
 
 <script>
   let videoId = null;
+  let videoSource = null; // 'download' | 'upload'
+  let instagramConfigured = false;
 
   async function checkStatus() {
     try {
       const d = await fetch('/auth/status').then(r => r.json());
       document.getElementById('dot-fb').classList.toggle('on', d.facebook_configured);
+      document.getElementById('dot-ig').classList.toggle('on', d.instagram_configured);
+      instagramConfigured = d.instagram_configured;
     } catch {}
+  }
+
+  function updatePostButton() {
+    const btn = document.getElementById('btn-post');
+    const hint = document.getElementById('post-hint');
+    if (videoSource === 'upload') {
+      btn.textContent = 'Facebook & Instagramに投稿';
+      hint.textContent = instagramConfigured ? '' : '※ Instagram未設定のためFacebookのみ投稿されます';
+    } else {
+      btn.textContent = 'Facebookに投稿 & カメラロールに保存';
+      hint.textContent = '共有シートが開いたら「ビデオを保存」をタップ';
+    }
   }
 
   function setStatus(msg, type = '') {
@@ -174,9 +191,11 @@
       if (!res.ok) throw new Error((await res.json()).detail);
       const data = await res.json();
       videoId = data.video_id;
+      videoSource = 'download';
       document.getElementById('preview').src = `/api/video/${videoId}`;
       document.getElementById('section-result').classList.remove('hidden');
       document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
+      updatePostButton();
       setStatus('ダウンロード完了 ✓', 'success');
     } catch (e) {
       setStatus(e.message, 'error');
@@ -202,9 +221,11 @@
       if (!res.ok) throw new Error((await res.json()).detail);
       const data = await res.json();
       videoId = data.video_id;
+      videoSource = 'upload';
       document.getElementById('preview').src = `/api/video/${videoId}`;
       document.getElementById('section-result').classList.remove('hidden');
       document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
+      updatePostButton();
       setStatus('アップロード完了 ✓', 'success');
     } catch (e) {
       setStatus(e.message, 'error');
@@ -218,47 +239,80 @@
     const btn = document.getElementById('btn-post');
     btn.disabled = true;
 
-    // Step1: 保存（共有シートが閉じるまで待つ）
-    if (navigator.share) {
-      try {
-        setStatus('動画を準備中...', 'loading');
-        const res = await fetch(`/api/video/${videoId}`);
-        const blob = await res.blob();
-        const file = new File([blob], 'video.mp4', { type: 'video/mp4' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file] });
-        }
-      } catch (e) {
-        if (e.name !== 'AbortError') {
-          const a = document.createElement('a');
-          a.href = `/api/video/${videoId}?download=true`;
-          a.download = 'video.mp4';
-          a.click();
-        }
-      }
-    } else {
-      const a = document.createElement('a');
-      a.href = `/api/video/${videoId}?download=true`;
-      a.download = 'video.mp4';
-      a.click();
-    }
+    if (videoSource === 'upload') {
+      // アップロード元: Facebook + Instagram に投稿
+      setStatus('Facebook & Instagramに投稿中...', 'loading');
 
-    // Step2: 共有シートが閉じた後、iOSのネットワーク再開を待ってからFacebook投稿
-    await new Promise(r => setTimeout(r, 600));
-    setStatus('Facebookに投稿中...', 'loading');
-    try {
-      const res = await fetch('/api/facebook/post', {
+      const fbPromise = fetch('/api/facebook/post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ video_id: videoId, message: caption }),
-      });
-      if (!res.ok) throw new Error((await res.json()).detail);
-      setStatus('Facebook投稿完了 & カメラロール保存済み ✓', 'success');
-    } catch (e) {
-      if (e.message === 'Load failed' || e.message === 'Failed to fetch' || e.message === 'NetworkError') {
-        setStatus('Facebook投稿完了（ネットワーク応答なし・Facebookで確認してください）', 'success');
+      }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); });
+
+      const igPromise = instagramConfigured
+        ? fetch('/api/instagram/post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_id: videoId, caption }),
+          }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); })
+        : Promise.reject(new Error('Instagram未設定'));
+
+      const [fbResult, igResult] = await Promise.allSettled([fbPromise, igPromise]);
+      const fbOk = fbResult.status === 'fulfilled';
+      const igOk = igResult.status === 'fulfilled';
+
+      if (fbOk && igOk) {
+        setStatus('Facebook & Instagram投稿完了 ✓', 'success');
+      } else if (fbOk) {
+        setStatus(`Facebook投稿完了 / Instagramエラー: ${igResult.reason.message}`, 'error');
+      } else if (igOk) {
+        setStatus(`Instagram投稿完了 / Facebookエラー: ${fbResult.reason.message}`, 'error');
       } else {
-        setStatus(`Facebookエラー: ${e.message}`, 'error');
+        setStatus(`Facebookエラー: ${fbResult.reason.message}`, 'error');
+      }
+
+    } else {
+      // ダウンロード元: 共有シートで保存 + Facebook投稿
+      if (navigator.share) {
+        try {
+          setStatus('動画を準備中...', 'loading');
+          const res = await fetch(`/api/video/${videoId}`);
+          const blob = await res.blob();
+          const file = new File([blob], 'video.mp4', { type: 'video/mp4' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file] });
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            const a = document.createElement('a');
+            a.href = `/api/video/${videoId}?download=true`;
+            a.download = 'video.mp4';
+            a.click();
+          }
+        }
+      } else {
+        const a = document.createElement('a');
+        a.href = `/api/video/${videoId}?download=true`;
+        a.download = 'video.mp4';
+        a.click();
+      }
+
+      await new Promise(r => setTimeout(r, 600));
+      setStatus('Facebookに投稿中...', 'loading');
+      try {
+        const res = await fetch('/api/facebook/post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_id: videoId, message: caption }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail);
+        setStatus('Facebook投稿完了 & カメラロール保存済み ✓', 'success');
+      } catch (e) {
+        if (e.message === 'Load failed' || e.message === 'Failed to fetch' || e.message === 'NetworkError') {
+          setStatus('Facebook投稿完了（Facebookで確認してください）', 'success');
+        } else {
+          setStatus(`Facebookエラー: ${e.message}`, 'error');
+        }
       }
     }
 
