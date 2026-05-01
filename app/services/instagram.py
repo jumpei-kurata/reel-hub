@@ -12,7 +12,10 @@ async def post_reel(video_id: str, caption: str) -> dict:
     ig_id = INSTAGRAM_BUSINESS_ACCOUNT_ID
     video_url = f"{APP_BASE_URL}/api/video/{video_id}"
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    # 各HTTPリクエストに30秒タイムアウト（ポーリングのsleepは含まれない）
+    request_timeout = httpx.Timeout(30.0)
+
+    async with httpx.AsyncClient() as client:
         # Step 1: メディアコンテナ作成（InstagramがURLから動画を取得）
         resp = await client.post(
             f"{_GRAPH_BASE}/{ig_id}/media",
@@ -22,6 +25,7 @@ async def post_reel(video_id: str, caption: str) -> dict:
                 "caption": caption,
                 "access_token": token,
             },
+            timeout=request_timeout,
         )
         if resp.status_code != 200:
             raise RuntimeError(f"Instagram container エラー: {resp.text}")
@@ -33,6 +37,7 @@ async def post_reel(video_id: str, caption: str) -> dict:
             status_resp = await client.get(
                 f"{_GRAPH_BASE}/{container_id}",
                 params={"fields": "status_code,status", "access_token": token},
+                timeout=request_timeout,
             )
             status_code = status_resp.json().get("status_code", "")
             if status_code == "FINISHED":
@@ -46,6 +51,7 @@ async def post_reel(video_id: str, caption: str) -> dict:
         pub_resp = await client.post(
             f"{_GRAPH_BASE}/{ig_id}/media_publish",
             data={"creation_id": container_id, "access_token": token},
+            timeout=request_timeout,
         )
         if pub_resp.status_code != 200:
             raise RuntimeError(f"Instagram 公開エラー: {pub_resp.text}")

@@ -163,8 +163,8 @@
     const btn = document.getElementById('btn-post');
     const hint = document.getElementById('post-hint');
     if (videoSource === 'upload') {
-      btn.textContent = 'Facebook & Instagramに投稿';
-      hint.textContent = instagramConfigured ? '' : '※ Instagram未設定のためFacebookのみ投稿されます';
+      btn.textContent = instagramConfigured ? 'Facebook & Instagramに投稿' : 'Facebookに投稿';
+      hint.textContent = instagramConfigured ? '' : '※ Instagram未設定（INSTAGRAM_BUSINESS_ACCOUNT_IDが必要）';
     } else {
       btn.textContent = 'Facebookに投稿 & カメラロールに保存';
       hint.textContent = '共有シートが開いたら「ビデオを保存」をタップ';
@@ -249,26 +249,34 @@
         body: JSON.stringify({ video_id: videoId, message: caption }),
       }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); });
 
-      const igPromise = instagramConfigured
-        ? fetch('/api/instagram/post', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_id: videoId, caption }),
-          }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); })
-        : Promise.reject(new Error('Instagram未設定'));
+      if (instagramConfigured) {
+        const igPromise = fetch('/api/instagram/post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_id: videoId, caption }),
+        }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); });
 
-      const [fbResult, igResult] = await Promise.allSettled([fbPromise, igPromise]);
-      const fbOk = fbResult.status === 'fulfilled';
-      const igOk = igResult.status === 'fulfilled';
+        const [fbResult, igResult] = await Promise.allSettled([fbPromise, igPromise]);
+        const fbOk = fbResult.status === 'fulfilled';
+        const igOk = igResult.status === 'fulfilled';
 
-      if (fbOk && igOk) {
-        setStatus('Facebook & Instagram投稿完了 ✓', 'success');
-      } else if (fbOk) {
-        setStatus(`Facebook投稿完了 / Instagramエラー: ${igResult.reason.message}`, 'error');
-      } else if (igOk) {
-        setStatus(`Instagram投稿完了 / Facebookエラー: ${fbResult.reason.message}`, 'error');
+        if (fbOk && igOk) {
+          setStatus('Facebook & Instagram投稿完了 ✓', 'success');
+        } else if (fbOk) {
+          setStatus(`Facebook投稿完了 / Instagramエラー: ${igResult.reason.message}`, 'error');
+        } else if (igOk) {
+          setStatus(`Instagram投稿完了 / Facebookエラー: ${fbResult.reason.message}`, 'error');
+        } else {
+          setStatus(`Facebookエラー: ${fbResult.reason.message}`, 'error');
+        }
       } else {
-        setStatus(`Facebookエラー: ${fbResult.reason.message}`, 'error');
+        // Instagram未設定: Facebookのみ
+        try {
+          await fbPromise;
+          setStatus('Facebook投稿完了 ✓', 'success');
+        } catch (e) {
+          setStatus(`Facebookエラー: ${e.message}`, 'error');
+        }
       }
 
     } else {
