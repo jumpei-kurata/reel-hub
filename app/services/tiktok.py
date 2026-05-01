@@ -23,7 +23,7 @@ async def post_video(video_path: str, caption: str, access_token: str) -> dict:
             json={
                 "post_info": {
                     "title": caption[:150],
-                    "privacy_level": "PUBLIC_TO_EVERYONE",
+                    "privacy_level": "SELF_ONLY",
                     "disable_duet": False,
                     "disable_comment": False,
                     "disable_stitch": False,
