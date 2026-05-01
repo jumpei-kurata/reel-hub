@@ -161,11 +161,8 @@
       tiktokConfigured = d.tiktok_configured;
       document.getElementById('dot-tt').classList.toggle('on', d.tiktok_configured);
       document.getElementById('dot-fb').classList.toggle('on', d.facebook_configured);
-      const label = document.getElementById('btn-post-label');
-      if (label) {
-        label.textContent = d.tiktok_configured
-          ? 'TikTok & Facebookに投稿'
-          : 'TikTokを認証して投稿';
+      if (!d.tiktok_configured) {
+        setStatus('TikTok未認証 — 投稿ボタンを押すと認証ページが開きます', 'error');
       }
     } catch {}
   }
@@ -240,6 +237,7 @@
   async function postAll() {
     if (!tiktokConfigured) {
       window.open('/auth/tiktok', '_blank');
+      setStatus('TikTok認証ページを開きました — 認証後に再度押してください', '');
       return;
     }
     if (!videoId) return;
