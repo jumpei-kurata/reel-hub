@@ -37,7 +37,6 @@
       z-index: 100;
     }
     .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-    .indicators { display: flex; gap: 12px; align-items: center; }
     .indicator { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--sub); }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
     .dot.on { background: var(--success); }
@@ -60,9 +59,7 @@
     .btn:active:not(:disabled) { transform: scale(0.97); opacity: 0.9; }
     .btn:disabled { opacity: 0.35; cursor: default; }
     .btn-primary { background: var(--primary); color: #fff; margin-top: 12px; }
-    .btn-save   { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
-    .btn-post   { background: linear-gradient(135deg, #111 50%, #1877f2 50%); color: #fff; }
-    .btn-auth   { background: #111; color: #fff; border: 1px solid var(--border); }
+    .btn-post { background: #1877f2; color: #fff; }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
     .divider { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; color: var(--sub); font-size: 12px; }
     .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -96,10 +93,7 @@
 <body>
 <header>
   <div class="logo">🎬 Reel Hub</div>
-  <div class="indicators">
-    <div class="indicator"><span class="dot" id="dot-tt"></span>TikTok</div>
-    <div class="indicator"><span class="dot" id="dot-fb"></span>Facebook</div>
-  </div>
+  <div class="indicator"><span class="dot" id="dot-fb"></span>Facebook</div>
 </header>
 
 <main>
@@ -136,14 +130,13 @@
       <label>キャプション / ハッシュタグ</label>
       <textarea id="caption"></textarea>
       <div class="actions">
-        <button class="btn btn-save" onclick="saveToDevice()">📱 カメラロールに保存</button>
-        <p style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">Safariで開けない場合は動画を長押し→「ビデオを保存」</p>
-        <button class="btn btn-post" id="btn-post" onclick="postAll()">
+        <button class="btn btn-post" id="btn-post" onclick="postAndSave()">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.34 6.34 0 1 0 5.54 6.29V8.78a8.18 8.18 0 0 0 4.78 1.52V6.85a4.85 4.85 0 0 1-1.01-.16z"/>
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
           </svg>
-          <span id="btn-post-label">TikTok & Facebookに投稿</span>
+          Facebookに投稿 & カメラロールに保存
         </button>
+        <p style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">Safariで開けない場合は動画を長押し→「ビデオを保存」</p>
       </div>
     </div>
   </div>
@@ -153,17 +146,11 @@
 
 <script>
   let videoId = null;
-  let tiktokConfigured = false;
 
   async function checkStatus() {
     try {
       const d = await fetch('/auth/status').then(r => r.json());
-      tiktokConfigured = d.tiktok_configured;
-      document.getElementById('dot-tt').classList.toggle('on', d.tiktok_configured);
       document.getElementById('dot-fb').classList.toggle('on', d.facebook_configured);
-      if (!d.tiktok_configured) {
-        setStatus('TikTok未認証 — 投稿ボタンを押すと認証ページが開きます', 'error');
-      }
     } catch {}
   }
 
@@ -187,8 +174,7 @@
       if (!res.ok) throw new Error((await res.json()).detail);
       const data = await res.json();
       videoId = data.video_id;
-      const vid = document.getElementById('preview');
-      vid.src = `/api/video/${videoId}`;
+      document.getElementById('preview').src = `/api/video/${videoId}`;
       document.getElementById('section-result').classList.remove('hidden');
       document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
       setStatus('ダウンロード完了 ✓', 'success');
@@ -226,50 +212,29 @@
     document.getElementById('file-input').value = '';
   }
 
-  function saveToDevice() {
-    if (!videoId) return;
-    const a = document.createElement('a');
-    a.href = `/api/video/${videoId}?download=true`;
-    a.download = 'video.mp4';
-    a.click();
-  }
-
-  async function postAll() {
-    if (!tiktokConfigured) {
-      window.open('/auth/tiktok', '_blank');
-      setStatus('TikTok認証ページを開きました — 認証後に再度押してください', '');
-      return;
-    }
+  async function postAndSave() {
     if (!videoId) return;
     const caption = document.getElementById('caption').value;
     const btn = document.getElementById('btn-post');
     btn.disabled = true;
-    setStatus('投稿中...', 'loading');
+    setStatus('Facebookに投稿中...', 'loading');
 
-    const [ttResult, fbResult] = await Promise.allSettled([
-      fetch('/api/tiktok/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_id: videoId, caption }),
-      }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); }),
-      fetch('/api/facebook/post', {
+    // カメラロール保存は先にトリガー
+    const a = document.createElement('a');
+    a.href = `/api/video/${videoId}?download=true`;
+    a.download = 'video.mp4';
+    a.click();
+
+    try {
+      const res = await fetch('/api/facebook/post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ video_id: videoId, message: caption }),
-      }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); }),
-    ]);
-
-    const ttOk = ttResult.status === 'fulfilled';
-    const fbOk = fbResult.status === 'fulfilled';
-
-    if (ttOk && fbOk) {
-      setStatus('TikTok & Facebookに投稿しました ✓', 'success');
-    } else if (ttOk) {
-      setStatus(`TikTok投稿完了 / Facebookエラー: ${fbResult.reason.message}`, 'error');
-    } else if (fbOk) {
-      setStatus(`Facebook投稿完了 / TikTokエラー: ${ttResult.reason.message}`, 'error');
-    } else {
-      setStatus(`TikTokエラー: ${ttResult.reason.message}`, 'error');
+      });
+      if (!res.ok) throw new Error((await res.json()).detail);
+      setStatus('Facebook投稿完了 & カメラロール保存済み ✓', 'success');
+    } catch (e) {
+      setStatus(`Facebookエラー: ${e.message}`, 'error');
     }
 
     btn.disabled = false;
