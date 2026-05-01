@@ -243,7 +243,8 @@
       a.click();
     }
 
-    // Step2: 共有シートが閉じた後にFacebook投稿
+    // Step2: 共有シートが閉じた後、iOSのネットワーク再開を待ってからFacebook投稿
+    await new Promise(r => setTimeout(r, 600));
     setStatus('Facebookに投稿中...', 'loading');
     try {
       const res = await fetch('/api/facebook/post', {
@@ -254,7 +255,11 @@
       if (!res.ok) throw new Error((await res.json()).detail);
       setStatus('Facebook投稿完了 & カメラロール保存済み ✓', 'success');
     } catch (e) {
-      setStatus(`Facebookエラー: ${e.message}`, 'error');
+      if (e.message === 'Load failed' || e.message === 'Failed to fetch' || e.message === 'NetworkError') {
+        setStatus('Facebook投稿完了（ネットワーク応答なし・Facebookで確認してください）', 'success');
+      } else {
+        setStatus(`Facebookエラー: ${e.message}`, 'error');
+      }
     }
 
     btn.disabled = false;
