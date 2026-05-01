@@ -112,14 +112,20 @@ async def tiktok_callback(code: str, state: str):
 <html lang="ja"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  body{font-family:-apple-system,sans-serif;background:#0d0d0d;color:#fff;padding:24px;max-width:500px;margin:0 auto}
+  body{font-family:-apple-system,sans-serif;background:#0d0d0d;color:#fff;padding:24px;max-width:500px;margin:0 auto;text-align:center;padding-top:60px}
   h2{color:#00b894;margin-bottom:16px}
   p{color:#aaa;font-size:14px}
-  a{color:#6c5ce7;display:inline-block;margin-top:20px;font-size:16px}
 </style></head><body>
 <h2>✅ TikTok認証完了</h2>
-<p>トークンを保存しました。次回以降は自動的にトークンを更新します。</p>
-<a href="/">← ホームへ戻る</a>
+<p>このタブを閉じています...</p>
+<script>
+  if (window.opener) {
+    try { window.opener.checkStatus(); } catch(e) {}
+    window.close();
+  } else {
+    window.location.href = '/';
+  }
+</script>
 </body></html>""")
 
 
