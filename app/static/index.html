@@ -136,7 +136,7 @@
           </svg>
           Facebookに投稿 & カメラロールに保存
         </button>
-        <p style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">Safariで開けない場合は動画を長押し→「ビデオを保存」</p>
+        <p style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">共有シートが開いたら「ビデオを保存」をタップ</p>
       </div>
     </div>
   </div>
@@ -217,21 +217,42 @@
     const caption = document.getElementById('caption').value;
     const btn = document.getElementById('btn-post');
     btn.disabled = true;
-    setStatus('Facebookに投稿中...', 'loading');
+    setStatus('処理中...', 'loading');
 
-    // カメラロール保存は先にトリガー
-    const a = document.createElement('a');
-    a.href = `/api/video/${videoId}?download=true`;
-    a.download = 'video.mp4';
-    a.click();
+    // Facebook投稿をバックグラウンドで開始
+    const fbPromise = fetch('/api/facebook/post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_id: videoId, message: caption }),
+    }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); });
+
+    // iOS: Web Share APIで共有シートを開いて写真アプリに直接保存
+    if (navigator.share) {
+      try {
+        setStatus('動画を準備中...', 'loading');
+        const res = await fetch(`/api/video/${videoId}`);
+        const blob = await res.blob();
+        const file = new File([blob], 'video.mp4', { type: 'video/mp4' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          const a = document.createElement('a');
+          a.href = `/api/video/${videoId}?download=true`;
+          a.download = 'video.mp4';
+          a.click();
+        }
+      }
+    } else {
+      const a = document.createElement('a');
+      a.href = `/api/video/${videoId}?download=true`;
+      a.download = 'video.mp4';
+      a.click();
+    }
 
     try {
-      const res = await fetch('/api/facebook/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_id: videoId, message: caption }),
-      });
-      if (!res.ok) throw new Error((await res.json()).detail);
+      await fbPromise;
       setStatus('Facebook投稿完了 & カメラロール保存済み ✓', 'success');
     } catch (e) {
       setStatus(`Facebookエラー: ${e.message}`, 'error');
