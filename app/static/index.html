@@ -217,16 +217,8 @@
     const caption = document.getElementById('caption').value;
     const btn = document.getElementById('btn-post');
     btn.disabled = true;
-    setStatus('処理中...', 'loading');
 
-    // Facebook投稿をバックグラウンドで開始
-    const fbPromise = fetch('/api/facebook/post', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ video_id: videoId, message: caption }),
-    }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); });
-
-    // iOS: Web Share APIで共有シートを開いて写真アプリに直接保存
+    // Step1: 保存（共有シートが閉じるまで待つ）
     if (navigator.share) {
       try {
         setStatus('動画を準備中...', 'loading');
@@ -251,8 +243,15 @@
       a.click();
     }
 
+    // Step2: 共有シートが閉じた後にFacebook投稿
+    setStatus('Facebookに投稿中...', 'loading');
     try {
-      await fbPromise;
+      const res = await fetch('/api/facebook/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_id: videoId, message: caption }),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail);
       setStatus('Facebook投稿完了 & カメラロール保存済み ✓', 'success');
     } catch (e) {
       setStatus(`Facebookエラー: ${e.message}`, 'error');
