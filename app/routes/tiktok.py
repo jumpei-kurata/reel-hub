@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.config import APP_BASE_URL, TIKTOK_ACCESS_TOKEN, TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET
 from app.services.downloader import get_video_path
-from app.services.tiktok import exchange_code_for_tokens, post_video
+from app.services.tiktok import exchange_code_for_tokens, post_video, refresh_access_token
 
 router = APIRouter()
 
@@ -48,6 +48,7 @@ class TikTokPostRequest(BaseModel):
 
 @router.post("/api/tiktok/post")
 async def post_to_tiktok(req: TikTokPostRequest):
+    global _access_token, _refresh_token
     if not _access_token:
         raise HTTPException(status_code=503, detail="TikTokが認証されていません。/auth/tiktok を開いてください")
     if not _UUID_RE.match(req.video_id):
@@ -57,6 +58,20 @@ async def post_to_tiktok(req: TikTokPostRequest):
         return await post_video(path, req.caption, _access_token)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="動画が見つかりません")
+    except RuntimeError as e:
+        # トークン失効時に自動リフレッシュして1回リトライ
+        if "token" in str(e).lower() or "auth" in str(e).lower() or "access_token" in str(e).lower():
+            if _refresh_token and TIKTOK_CLIENT_KEY:
+                try:
+                    data = await refresh_access_token(_refresh_token, TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET)
+                    _access_token = data.get("access_token", "")
+                    _refresh_token = data.get("refresh_token", _refresh_token)
+                    _save_tokens(_access_token, _refresh_token)
+                    path = get_video_path(req.video_id)
+                    return await post_video(path, req.caption, _access_token)
+                except Exception as e2:
+                    raise HTTPException(status_code=500, detail=f"トークン更新失敗: {e2}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -93,17 +108,17 @@ async def tiktok_callback(code: str, state: str):
 
     _save_tokens(_access_token, _refresh_token)
 
-    return HTMLResponse(f"""<!DOCTYPE html>
+    return HTMLResponse("""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-  body{{font-family:-apple-system,sans-serif;background:#0d0d0d;color:#fff;padding:24px;max-width:500px;margin:0 auto}}
-  h2{{color:#00b894;margin-bottom:16px}}
-  p{{color:#aaa;font-size:14px}}
-  a{{color:#6c5ce7;display:inline-block;margin-top:20px;font-size:16px}}
+  body{font-family:-apple-system,sans-serif;background:#0d0d0d;color:#fff;padding:24px;max-width:500px;margin:0 auto}
+  h2{color:#00b894;margin-bottom:16px}
+  p{color:#aaa;font-size:14px}
+  a{color:#6c5ce7;display:inline-block;margin-top:20px;font-size:16px}
 </style></head><body>
 <h2>✅ TikTok認証完了</h2>
-<p>トークンを保存しました。再起動後も自動的に復元されます。</p>
+<p>トークンを保存しました。次回以降は自動的にトークンを更新します。</p>
 <a href="/">← ホームへ戻る</a>
 </body></html>""")
 

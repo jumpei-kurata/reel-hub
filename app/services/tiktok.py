@@ -47,7 +47,7 @@ async def post_video(video_path: str, caption: str, access_token: str) -> dict:
         with open(video_path, "rb") as f:
             for i in range(total_chunks):
                 chunk = f.read(chunk_size)
-                start = i * _CHUNK_SIZE
+                start = i * chunk_size
                 end = start + len(chunk) - 1
                 upload_resp = await client.put(
                     upload_url,
@@ -79,4 +79,21 @@ async def exchange_code_for_tokens(code: str, redirect_uri: str, client_key: str
         )
     if resp.status_code != 200:
         raise RuntimeError(f"TikTok token エラー: {resp.text}")
+    return resp.json()
+
+
+async def refresh_access_token(refresh_token: str, client_key: str, client_secret: str) -> dict:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{_API_BASE}/oauth/token/",
+            data={
+                "client_key": client_key,
+                "client_secret": client_secret,
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+    if resp.status_code != 200:
+        raise RuntimeError(f"TikTok refresh エラー: {resp.text}")
     return resp.json()
