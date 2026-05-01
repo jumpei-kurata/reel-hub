@@ -9,7 +9,8 @@ _CHUNK_SIZE = 10 * 1024 * 1024  # 10MB
 
 async def post_video(video_path: str, caption: str, access_token: str) -> dict:
     file_size = os.path.getsize(video_path)
-    total_chunks = math.ceil(file_size / _CHUNK_SIZE)
+    chunk_size = _CHUNK_SIZE if file_size > _CHUNK_SIZE else file_size
+    total_chunks = math.ceil(file_size / chunk_size)
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json; charset=UTF-8",
@@ -30,7 +31,7 @@ async def post_video(video_path: str, caption: str, access_token: str) -> dict:
                 "source_info": {
                     "source": "FILE_UPLOAD",
                     "video_size": file_size,
-                    "chunk_size": _CHUNK_SIZE,
+                    "chunk_size": chunk_size,
                     "total_chunk_count": total_chunks,
                 },
             },
@@ -45,7 +46,7 @@ async def post_video(video_path: str, caption: str, access_token: str) -> dict:
 
         with open(video_path, "rb") as f:
             for i in range(total_chunks):
-                chunk = f.read(_CHUNK_SIZE)
+                chunk = f.read(chunk_size)
                 start = i * _CHUNK_SIZE
                 end = start + len(chunk) - 1
                 upload_resp = await client.put(
