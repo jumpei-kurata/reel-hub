@@ -1,9 +1,13 @@
+import os
 import re
+import shutil
+import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from app.config import DOWNLOAD_DIR
 from app.services.downloader import download_video, get_video_path
 
 router = APIRouter()
@@ -21,6 +25,20 @@ async def download(req: DownloadRequest):
         return await download_video(req.url)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/upload")
+async def upload_video(file: UploadFile = File(...)):
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".mp4"
+    if ext not in (".mp4", ".mov", ".m4v"):
+        raise HTTPException(status_code=400, detail="mp4 / mov のみ対応しています")
+    video_id = str(uuid.uuid4())
+    output_dir = os.path.join(DOWNLOAD_DIR, video_id)
+    os.makedirs(output_dir, exist_ok=True)
+    dest = os.path.join(output_dir, f"video{ext}")
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return {"video_id": video_id}
 
 
 @router.get("/video/{video_id}")

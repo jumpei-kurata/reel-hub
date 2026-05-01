@@ -64,6 +64,15 @@
     .btn-post   { background: linear-gradient(135deg, #111 50%, #1877f2 50%); color: #fff; }
     .btn-auth   { background: #111; color: #fff; border: 1px solid var(--border); }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .divider { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; color: var(--sub); font-size: 12px; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .upload-area {
+      border: 2px dashed var(--border); border-radius: 10px; padding: 24px 16px;
+      text-align: center; cursor: pointer; transition: border-color .2s;
+    }
+    .upload-area:hover, .upload-area.dragover { border-color: var(--primary); }
+    .upload-area input { display: none; }
+    .upload-area p { font-size: 14px; color: var(--sub); margin-top: 6px; }
     video { width: 100%; border-radius: 10px; max-height: 380px; background: #000; display: block; }
     .hidden { display: none !important; }
     footer {
@@ -99,6 +108,22 @@
     <input type="url" id="url" placeholder="https://www.instagram.com/reel/..."
       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
     <button class="btn btn-primary" id="btn-dl" onclick="startDownload()">ダウンロード</button>
+  </div>
+
+  <div class="divider">または</div>
+
+  <div class="card">
+    <label>動画ファイルをアップロード</label>
+    <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleDrop(event)">
+      <input type="file" id="file-input" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" onchange="uploadFile(this.files[0])">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="1.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p>タップして選択 / ドラッグ&ドロップ</p>
+    </div>
   </div>
 
   <div id="section-result" class="hidden">
@@ -175,6 +200,33 @@
     } finally {
       document.getElementById('btn-dl').disabled = false;
     }
+  }
+
+  function handleDrop(event) {
+    event.preventDefault();
+    document.getElementById('upload-area').classList.remove('dragover');
+    const file = event.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    setStatus('アップロード中...', 'loading');
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error((await res.json()).detail);
+      const data = await res.json();
+      videoId = data.video_id;
+      document.getElementById('preview').src = `/api/video/${videoId}`;
+      document.getElementById('section-result').classList.remove('hidden');
+      document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
+      setStatus('アップロード完了 ✓', 'success');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+    document.getElementById('file-input').value = '';
   }
 
   function saveToDevice() {
