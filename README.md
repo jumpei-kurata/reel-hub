@@ -16,7 +16,7 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 | Facebook自動投稿 | ✅ 動作中 |
 | カメラロール保存（iOS Web Share API） | ✅ 動作中 |
 | Instagramへの自動投稿 | ⚠️ コード実装済み・Meta Portal設定待ち（後日作業） |
-| コメント自動いいね＆絵文字返信 | 📋 未実装・Insta投稿が動いてから実装予定 |
+| コメント自動いいね＆絵文字返信 | ⚠️ コード実装済み・cron-job.org設定待ち（Insta投稿確認後） |
 | TikTok投稿 | ❌ 廃止（ポリシー違反・Sandbox非公開制限のため） |
 
 ## 技術構成
@@ -107,26 +107,27 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 
 ---
 
-## コメント自動いいね＆絵文字返信（📋 Insta投稿が動いてから実装）
+## コメント自動いいね＆絵文字返信（⚠️ コード実装済み・Insta投稿確認後にcron設定）
 
 > **無料で実装可能**。追加費用なし。
 
 ### 仕様
 
+- 最新10件の投稿のコメントを全取得
 - 全コメントに自動いいね
-- 絵文字のみのコメント（テキストなし）には `🔥🔥🔥` で自動返信
-- 5〜10分ごとにポーリングして新着コメントを処理
+- 絵文字のみのコメント（アルファベット・数字・CJK文字を含まない）には `🔥🔥🔥` で自動返信
+- 処理済みコメントIDは `/tmp/reel-hub/processed_comments.json` に保存（Render再起動で消えるが実害なし）
 
 ### 追加で必要な権限
 
-- `instagram_manage_comments`（いいね・返信・コメント取得すべてこれ1つ）
+- `instagram_business_manage_comments`（いいね・返信・コメント取得すべてこれ1つ）
 
-### 実装方針
+### cron-job.org設定（Insta投稿が動いたら）
 
-- ポーリング方式（App ReviewなしでOK・開発モードで自分のアカウントに適用可）
-- Webhooksは不要（App Reviewが必要になるため）
-- 処理済みコメントIDをファイルに保存して二重いいね・返信を防止
-- cron-job.orgから `/api/instagram/process-comments` を定期呼び出し
+1. [cron-job.org](https://cron-job.org) でジョブを追加
+2. URL: `https://reel-hub.onrender.com/api/instagram/process-comments`
+3. Method: POST
+4. Crontab: `*/7 * * * *`（7分ごと）
 
 ---
 

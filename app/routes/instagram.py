@@ -26,3 +26,14 @@ async def post_to_instagram(req: InstagramPostRequest):
         return await post_reel(req.video_id, req.caption)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/instagram/process-comments")
+async def process_instagram_comments():
+    if not FACEBOOK_PAGE_ACCESS_TOKEN or not INSTAGRAM_BUSINESS_ACCOUNT_ID:
+        raise HTTPException(status_code=503, detail="Instagramが設定されていません")
+    try:
+        from app.services.instagram_comments import process_comments
+        return await process_comments()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
