@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
@@ -7,6 +9,14 @@ router = APIRouter()
 @router.get("/ping")
 async def ping():
     return {"status": "ok"}
+
+
+@router.get("/auth/status")
+async def auth_status():
+    return {
+        "facebook_configured": bool(os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")),
+        "instagram_configured": bool(os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")),
+    }
 
 
 _TERMS_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>利用規約 - Reel Hub</title>
@@ -21,15 +31,10 @@ _PRIVACY_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><t
 <style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:0 20px;line-height:1.6}</style></head>
 <body><h1>プライバシーポリシー</h1><p>本ツール（Reel Hub）のプライバシーポリシーについて説明します。</p>
 <h2>収集する情報</h2><p>本ツールは運営者個人のみが使用するプライベートツールであり、第三者の個人情報を収集・保存しません。</p>
-<h2>TikTokとの連携</h2><p>TikTok APIを通じて取得するデータ（アクセストークン等）は、コンテンツ投稿のみに使用し、第三者と共有しません。</p>
 <h2>Facebookとの連携</h2><p>Facebook APIを通じて取得するデータは、ページへのコンテンツ投稿のみに使用します。</p>
 <h2>データの保管</h2><p>一時的にダウンロードした動画ファイルはサーバー再起動時に削除されます。</p>
 <p>最終更新日: 2024年1月</p></body></html>"""
 
-
-@router.get("/tiktokUoIBAU2M3OKbXL0V3Hhx95CPTkjwzQpA.txt", response_class=PlainTextResponse)
-async def tiktok_verify():
-    return "tiktok-developers-site-verification=UolBAU2M3OKbXL0V3Hhx95CPTkjwzQpA"
 
 
 @router.get("/terms", response_class=HTMLResponse)

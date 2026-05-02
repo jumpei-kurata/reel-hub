@@ -9,7 +9,6 @@ load_dotenv()
 
 from app.routes import download, facebook, health
 from app.routes.instagram import router as instagram_router
-from app.routes.tiktok import router as tiktok_router
 from app.config import DOWNLOAD_DIR
 
 
@@ -25,6 +24,5 @@ app.include_router(health.router)
 app.include_router(download.router, prefix="/api")
 app.include_router(facebook.router, prefix="/api")
 app.include_router(instagram_router)
-app.include_router(tiktok_router)
 
 app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
