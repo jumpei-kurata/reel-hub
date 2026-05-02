@@ -8,14 +8,15 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 - ローカル動画ファイルをアップロード → Facebook & Instagramに自動投稿
 - キャプション・ハッシュタグを毎回編集可能（デフォルト: `#ダンス #ブレイクダンス #dance #breakdance #`）
 
-## 現在の状態（2026-05-01）
+## 現在の状態（2026-05-02）
 
 | 機能 | 状態 |
 |------|------|
 | Instagram URLダウンロード | ✅ 動作中 |
 | Facebook自動投稿 | ✅ 動作中 |
 | カメラロール保存（iOS Web Share API） | ✅ 動作中 |
-| Instagramへの自動投稿 | ⚠️ コード実装済み・環境変数未設定（後日作業） |
+| Instagramへの自動投稿 | ⚠️ コード実装済み・Meta Portal設定待ち（後日作業） |
+| コメント自動いいね＆絵文字返信 | 📋 未実装・Insta投稿が動いてから実装予定 |
 | TikTok投稿 | ❌ 廃止（ポリシー違反・Sandbox非公開制限のため） |
 
 ## 技術構成
@@ -103,6 +104,29 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 ### 3. Renderに環境変数を設定
 
 `INSTAGRAM_BUSINESS_ACCOUNT_ID` に取得したIDを設定 → Redeploy。
+
+---
+
+## コメント自動いいね＆絵文字返信（📋 Insta投稿が動いてから実装）
+
+> **無料で実装可能**。追加費用なし。
+
+### 仕様
+
+- 全コメントに自動いいね
+- 絵文字のみのコメント（テキストなし）には `🔥🔥🔥` で自動返信
+- 5〜10分ごとにポーリングして新着コメントを処理
+
+### 追加で必要な権限
+
+- `instagram_manage_comments`（いいね・返信・コメント取得すべてこれ1つ）
+
+### 実装方針
+
+- ポーリング方式（App ReviewなしでOK・開発モードで自分のアカウントに適用可）
+- Webhooksは不要（App Reviewが必要になるため）
+- 処理済みコメントIDをファイルに保存して二重いいね・返信を防止
+- cron-job.orgから `/api/instagram/process-comments` を定期呼び出し
 
 ---
 
