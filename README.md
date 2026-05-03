@@ -139,7 +139,7 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 
 ### 追加で必要な権限
 
-- `instagram_business_manage_comments`（いいね・返信・コメント取得すべてこれ1つ）
+- `instagram_manage_comments`（いいね・返信・コメント取得すべてこれ1つ）
 
 ### cron-job.org設定（Insta投稿が動いたら）
 

@@ -36,6 +36,16 @@ def is_emoji_only(text: str) -> bool:
     return True
 
 
+async def _already_replied(client: httpx.AsyncClient, comment_id: str, token: str) -> bool:
+    """自分がすでに🔥🔥🔥で返信済みかどうか確認（サーバー再起動後の重複返信防止）"""
+    resp = await client.get(
+        f"{_GRAPH_BASE}/{comment_id}/replies",
+        params={"fields": "text", "access_token": token},
+    )
+    data = resp.json()
+    return any(r.get("text") == _REPLY_TEXT for r in data.get("data", []))
+
+
 async def process_comments() -> dict:
     token = FACEBOOK_PAGE_ACCESS_TOKEN
     ig_id = INSTAGRAM_BUSINESS_ACCOUNT_ID
@@ -67,27 +77,28 @@ async def process_comments() -> dict:
 
             for comment in comments_data.get("data", []):
                 cid = comment["id"]
-                if cid in processed:
-                    continue
-
                 text = comment.get("text", "")
 
-                try:
-                    await client.post(
-                        f"{_GRAPH_BASE}/{cid}/likes",
-                        data={"access_token": token},
-                    )
-                    liked += 1
-                except Exception as e:
-                    errors.append(f"like {cid}: {e}")
-
-                if is_emoji_only(text):
+                # いいね（processed済みでもidempotentなので毎回試みる）
+                if cid not in processed:
                     try:
                         await client.post(
-                            f"{_GRAPH_BASE}/{cid}/replies",
-                            data={"message": _REPLY_TEXT, "access_token": token},
+                            f"{_GRAPH_BASE}/{cid}/likes",
+                            data={"access_token": token},
                         )
-                        replied += 1
+                        liked += 1
+                    except Exception as e:
+                        errors.append(f"like {cid}: {e}")
+
+                # 絵文字のみなら返信（APIで重複チェック）
+                if is_emoji_only(text):
+                    try:
+                        if not await _already_replied(client, cid, token):
+                            await client.post(
+                                f"{_GRAPH_BASE}/{cid}/replies",
+                                data={"message": _REPLY_TEXT, "access_token": token},
+                            )
+                            replied += 1
                     except Exception as e:
                         errors.append(f"reply {cid}: {e}")
 
