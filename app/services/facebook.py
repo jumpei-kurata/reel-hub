@@ -21,6 +21,6 @@ async def post_video(video_path: str, message: str) -> dict:
             )
 
     if resp.status_code != 200:
-        raise RuntimeError(f"Facebook API エラー: {resp.text}")
+        raise RuntimeError(f"Facebook API エラー: [{resp.status_code}] {resp.text}")
 
     return resp.json()
