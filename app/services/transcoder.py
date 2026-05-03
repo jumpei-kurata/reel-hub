@@ -10,8 +10,11 @@ async def to_h264_mp4(input_path: str, output_path: str) -> None:
         ffmpeg,
         "-i", input_path,
         "-c:v", "libx264",
-        "-preset", "fast",
+        "-preset", "ultrafast",
         "-crf", "23",
+        "-refs", "1",
+        "-threads", "1",
+        "-vf", "scale=-2:min(1080\\,ih)",  # 4K以上は1080pにダウンスケール
         "-c:a", "aac",
         "-b:a", "128k",
         "-movflags", "+faststart",
