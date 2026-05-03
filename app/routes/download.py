@@ -27,35 +27,17 @@ async def download(req: DownloadRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-_MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # 500MB
-
-
 @router.post("/upload")
 async def upload_video(file: UploadFile = File(...)):
-    from app.services.transcoder import to_h264_mp4
-
     ext = os.path.splitext(file.filename or "")[1].lower() or ".mp4"
     if ext not in (".mp4", ".mov", ".m4v"):
         raise HTTPException(status_code=400, detail="mp4 / mov のみ対応しています")
-
     video_id = str(uuid.uuid4())
     output_dir = os.path.join(DOWNLOAD_DIR, video_id)
     os.makedirs(output_dir, exist_ok=True)
-
-    raw_path = os.path.join(output_dir, f"raw{ext}")
-    size = 0
-    with open(raw_path, "wb") as f:
-        while chunk := file.file.read(1024 * 1024):
-            size += len(chunk)
-            if size > _MAX_UPLOAD_BYTES:
-                os.remove(raw_path)
-                raise HTTPException(status_code=413, detail="ファイルが大きすぎます（500MB以下にしてください）")
-            f.write(chunk)
-
-    mp4_path = os.path.join(output_dir, "video.mp4")
-    await to_h264_mp4(raw_path, mp4_path)
-    os.remove(raw_path)
-
+    dest = os.path.join(output_dir, f"video{ext}")
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
     return {"video_id": video_id}
 
 
