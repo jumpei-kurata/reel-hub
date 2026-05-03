@@ -68,7 +68,7 @@ async def process_comments() -> dict:
 
             comments_resp = await client.get(
                 f"{_GRAPH_BASE}/{media_id}/comments",
-                params={"fields": "id,text,timestamp", "access_token": token},
+                params={"fields": "id,text,timestamp,user_likes", "access_token": token},
             )
             comments_data = comments_resp.json()
             if "error" in comments_data:
@@ -78,9 +78,10 @@ async def process_comments() -> dict:
             for comment in comments_data.get("data", []):
                 cid = comment["id"]
                 text = comment.get("text", "")
+                already_liked = comment.get("user_likes", False)
 
-                # いいね（processed済みでもidempotentなので毎回試みる）
-                if cid not in processed:
+                # いいね（user_likesでAPI確認済みなのでサーバー再起動後も2度押しなし）
+                if not already_liked:
                     try:
                         await client.post(
                             f"{_GRAPH_BASE}/{cid}/likes",
