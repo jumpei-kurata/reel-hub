@@ -1,4 +1,5 @@
 import json
+import time
 import unicodedata
 from pathlib import Path
 
@@ -9,17 +10,24 @@ from app.config import DOWNLOAD_DIR, FACEBOOK_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSIN
 _GRAPH_BASE = "https://graph.facebook.com/v19.0"
 _PROCESSED_FILE = Path(DOWNLOAD_DIR) / "processed_comments.json"
 _REPLY_TEXT = "🔥🔥🔥"
+_TTL_SECONDS = 30 * 24 * 60 * 60  # 30日
 
 
-def _load_processed() -> set[str]:
+def _load_processed() -> dict[str, float]:
     try:
-        return set(json.loads(_PROCESSED_FILE.read_text()))
+        data = json.loads(_PROCESSED_FILE.read_text())
+        if not isinstance(data, dict):
+            # 旧フォーマット（list）からの移行: 現在時刻で引き継ぐ
+            now = time.time()
+            data = {k: now for k in data}
+        cutoff = time.time() - _TTL_SECONDS
+        return {k: v for k, v in data.items() if v > cutoff}
     except Exception:
-        return set()
+        return {}
 
 
-def _save_processed(ids: set[str]) -> None:
-    _PROCESSED_FILE.write_text(json.dumps(list(ids)))
+def _save_processed(ids: dict[str, float]) -> None:
+    _PROCESSED_FILE.write_text(json.dumps(ids))
 
 
 def is_emoji_only(text: str) -> bool:
@@ -68,7 +76,7 @@ async def process_comments() -> dict:
 
             comments_resp = await client.get(
                 f"{_GRAPH_BASE}/{media_id}/comments",
-                params={"fields": "id,text,timestamp,user_likes", "access_token": token},
+                params={"fields": "id,text,timestamp,from", "access_token": token},
             )
             comments_data = comments_resp.json()
             if "error" in comments_data:
@@ -77,33 +85,63 @@ async def process_comments() -> dict:
 
             for comment in comments_data.get("data", []):
                 cid = comment["id"]
-                text = comment.get("text", "")
-                already_liked = comment.get("user_likes", False)
 
-                # いいね（user_likesでAPI確認済みなのでサーバー再起動後も2度押しなし）
-                if not already_liked:
-                    try:
-                        await client.post(
-                            f"{_GRAPH_BASE}/{cid}/likes",
-                            data={"access_token": token},
-                        )
-                        liked += 1
-                    except Exception as e:
-                        errors.append(f"like {cid}: {e}")
+                if cid not in processed:
+                    # 自分のコメントはスキップ（いいね・返信しない）
+                    if comment.get("from", {}).get("id") == ig_id:
+                        processed[cid] = time.time()
+                    else:
+                        text = comment.get("text", "")
 
-                # 絵文字のみなら返信（APIで重複チェック）
-                if is_emoji_only(text):
-                    try:
-                        if not await _already_replied(client, cid, token):
+                        # いいね
+                        try:
                             await client.post(
-                                f"{_GRAPH_BASE}/{cid}/replies",
-                                data={"message": _REPLY_TEXT, "access_token": token},
+                                f"{_GRAPH_BASE}/{cid}/likes",
+                                data={"access_token": token},
                             )
-                            replied += 1
-                    except Exception as e:
-                        errors.append(f"reply {cid}: {e}")
+                            liked += 1
+                        except Exception as e:
+                            errors.append(f"like {cid}: {e}")
 
-                processed.add(cid)
+                        # 絵文字のみなら返信（APIで重複チェック）
+                        if is_emoji_only(text):
+                            try:
+                                if not await _already_replied(client, cid, token):
+                                    await client.post(
+                                        f"{_GRAPH_BASE}/{cid}/replies",
+                                        data={"message": _REPLY_TEXT, "access_token": token},
+                                    )
+                                    replied += 1
+                            except Exception as e:
+                                errors.append(f"reply {cid}: {e}")
+
+                        processed[cid] = time.time()
+
+                # 返信を処理（常に取得して新しい返信を見逃さない）
+                try:
+                    replies_resp = await client.get(
+                        f"{_GRAPH_BASE}/{cid}/replies",
+                        params={"fields": "id,from", "access_token": token},
+                    )
+                    replies_data = replies_resp.json()
+                    for reply in replies_data.get("data", []):
+                        rid = reply["id"]
+                        if rid in processed:
+                            continue
+                        if reply.get("from", {}).get("id") == ig_id:
+                            processed[rid] = time.time()
+                            continue
+                        try:
+                            await client.post(
+                                f"{_GRAPH_BASE}/{rid}/likes",
+                                data={"access_token": token},
+                            )
+                            liked += 1
+                        except Exception as e:
+                            errors.append(f"like reply {rid}: {e}")
+                        processed[rid] = time.time()
+                except Exception as e:
+                    errors.append(f"replies {cid}: {e}")
 
     _save_processed(processed)
     return {"liked": liked, "replied": replied, "errors": errors}
