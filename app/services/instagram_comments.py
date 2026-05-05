@@ -54,10 +54,10 @@ async def _already_replied(client: httpx.AsyncClient, comment_id: str, token: st
     return any(r.get("text") == _REPLY_TEXT for r in data.get("data", []))
 
 
-async def process_comments() -> dict:
+async def process_comments(reset: bool = False) -> dict:
     token = FACEBOOK_PAGE_ACCESS_TOKEN
     ig_id = INSTAGRAM_BUSINESS_ACCOUNT_ID
-    processed = _load_processed()
+    processed = {} if reset else _load_processed()
     liked = 0
     replied = 0
     errors = []

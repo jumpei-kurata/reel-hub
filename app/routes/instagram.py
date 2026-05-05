@@ -29,11 +29,11 @@ async def post_to_instagram(req: InstagramPostRequest):
 
 
 @router.post("/api/instagram/process-comments")
-async def process_instagram_comments():
+async def process_instagram_comments(reset: bool = False):
     if not FACEBOOK_PAGE_ACCESS_TOKEN or not INSTAGRAM_BUSINESS_ACCOUNT_ID:
         raise HTTPException(status_code=503, detail="Instagramが設定されていません")
     try:
         from app.services.instagram_comments import process_comments
-        return await process_comments()
+        return await process_comments(reset=reset)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
