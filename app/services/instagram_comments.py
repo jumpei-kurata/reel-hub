@@ -95,11 +95,15 @@ async def process_comments(reset: bool = False) -> dict:
 
                         # いいね
                         try:
-                            await client.post(
+                            r = await client.post(
                                 f"{_GRAPH_BASE}/{cid}/likes",
                                 data={"access_token": token},
                             )
-                            liked += 1
+                            body = r.json()
+                            if isinstance(body, dict) and "error" in body:
+                                errors.append(f"like {cid}: {body['error'].get('message', body)}")
+                            else:
+                                liked += 1
                         except Exception as e:
                             errors.append(f"like {cid}: {e}")
 
@@ -107,11 +111,15 @@ async def process_comments(reset: bool = False) -> dict:
                         if is_emoji_only(text):
                             try:
                                 if not await _already_replied(client, cid, token):
-                                    await client.post(
+                                    r = await client.post(
                                         f"{_GRAPH_BASE}/{cid}/replies",
                                         data={"message": _REPLY_TEXT, "access_token": token},
                                     )
-                                    replied += 1
+                                    body = r.json()
+                                    if isinstance(body, dict) and "error" in body:
+                                        errors.append(f"reply {cid}: {body['error'].get('message', body)}")
+                                    else:
+                                        replied += 1
                             except Exception as e:
                                 errors.append(f"reply {cid}: {e}")
 
@@ -132,11 +140,15 @@ async def process_comments(reset: bool = False) -> dict:
                             processed[rid] = time.time()
                             continue
                         try:
-                            await client.post(
+                            r = await client.post(
                                 f"{_GRAPH_BASE}/{rid}/likes",
                                 data={"access_token": token},
                             )
-                            liked += 1
+                            body = r.json()
+                            if isinstance(body, dict) and "error" in body:
+                                errors.append(f"like reply {rid}: {body['error'].get('message', body)}")
+                            else:
+                                liked += 1
                         except Exception as e:
                             errors.append(f"like reply {rid}: {e}")
                         processed[rid] = time.time()
