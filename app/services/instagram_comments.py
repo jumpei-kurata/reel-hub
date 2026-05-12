@@ -13,6 +13,30 @@ _REPLY_TEXT = "🔥🔥🔥"
 _TTL_SECONDS = 30 * 24 * 60 * 60  # 30日
 
 
+def _format_api_error(prefix: str, r: httpx.Response) -> str:
+    try:
+        body = r.json()
+    except Exception:
+        body = {}
+    err = body.get("error", {}) if isinstance(body, dict) else {}
+    return (
+        f"{prefix}: HTTP {r.status_code} "
+        f"code={err.get('code')} subcode={err.get('error_subcode')} "
+        f"trace={err.get('fbtrace_id')} "
+        f"msg={err.get('message') or r.text[:200]}"
+    )
+
+
+def _is_error_response(r: httpx.Response) -> bool:
+    if r.status_code >= 400:
+        return True
+    try:
+        body = r.json()
+    except Exception:
+        return False
+    return isinstance(body, dict) and "error" in body
+
+
 def _load_processed() -> dict[str, float]:
     try:
         data = json.loads(_PROCESSED_FILE.read_text())
@@ -99,9 +123,8 @@ async def process_comments(reset: bool = False) -> dict:
                                 f"{_GRAPH_BASE}/{cid}/likes",
                                 data={"access_token": token},
                             )
-                            body = r.json()
-                            if isinstance(body, dict) and "error" in body:
-                                errors.append(f"like {cid}: {body['error'].get('message', body)}")
+                            if _is_error_response(r):
+                                errors.append(_format_api_error(f"like {cid}", r))
                             else:
                                 liked += 1
                         except Exception as e:
@@ -115,9 +138,8 @@ async def process_comments(reset: bool = False) -> dict:
                                         f"{_GRAPH_BASE}/{cid}/replies",
                                         data={"message": _REPLY_TEXT, "access_token": token},
                                     )
-                                    body = r.json()
-                                    if isinstance(body, dict) and "error" in body:
-                                        errors.append(f"reply {cid}: {body['error'].get('message', body)}")
+                                    if _is_error_response(r):
+                                        errors.append(_format_api_error(f"reply {cid}", r))
                                     else:
                                         replied += 1
                             except Exception as e:
@@ -144,9 +166,8 @@ async def process_comments(reset: bool = False) -> dict:
                                 f"{_GRAPH_BASE}/{rid}/likes",
                                 data={"access_token": token},
                             )
-                            body = r.json()
-                            if isinstance(body, dict) and "error" in body:
-                                errors.append(f"like reply {rid}: {body['error'].get('message', body)}")
+                            if _is_error_response(r):
+                                errors.append(_format_api_error(f"like reply {rid}", r))
                             else:
                                 liked += 1
                         except Exception as e:
