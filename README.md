@@ -140,10 +140,10 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 | ケース | いいね | 絵文字返信 |
 |--------|--------|-----------|
 | 他人のトップコメント（テキスト） | ✅ | ❌ |
-| 他人のトップコメント（絵文字のみ） | ✅ | ✅ `🔥🔥🔥` |
+| 他人のトップコメント（絵文字のみ） | ✅ | ✅ `🔥` `😎` `👏` 等から1個ランダム |
 | 自分のトップコメント | ❌ | ❌ |
 | 他人の返信（どんな内容でも） | ✅ | ❌ |
-| 自分の返信（`🔥🔥🔥` 含む） | ❌ | ❌ |
+| 自分の返信 | ❌ | ❌ |
 
 > Instagramのコメントは**2階層仕様**（トップコメント → リプライ）でリプライへのリプライは存在しないため、この2階層スキャンで全パターン網羅。
 
@@ -176,6 +176,50 @@ curl -X POST 'https://reel-hub.onrender.com/api/instagram/process-comments'
 # 全コメント再処理（processedキャッシュ無視）
 curl -X POST 'https://reel-hub.onrender.com/api/instagram/process-comments?reset=true'
 ```
+
+---
+
+## インサイト（投稿パフォーマンス確認）
+
+最新N件のIG投稿のリーチ・保存・いいね・コメント・シェア・再生数を取得して、再生数順に並べる。
+
+### エンドポイント
+
+```bash
+# デフォルト10件
+curl 'https://reel-hub.onrender.com/api/insights?secret={REFRESH_SECRET}'
+
+# 件数指定（1-25）
+curl 'https://reel-hub.onrender.com/api/insights?secret={REFRESH_SECRET}&limit=25'
+```
+
+### レスポンス例
+
+```json
+{
+  "count": 10,
+  "media": [
+    {
+      "id": "18068301401560329",
+      "type": "REELS",
+      "timestamp": "2026-05-10T12:34:56+0000",
+      "permalink": "https://www.instagram.com/p/...",
+      "caption": "新作リール！",
+      "insights": {
+        "reach": 12345,
+        "saved": 67,
+        "likes": 890,
+        "comments": 12,
+        "shares": 34,
+        "views": 54321
+      }
+    },
+    ...
+  ]
+}
+```
+
+> **認可**: `REFRESH_SECRET` を `?secret=` に渡す（リフレッシュエンドポイントと同じ）
 
 ---
 

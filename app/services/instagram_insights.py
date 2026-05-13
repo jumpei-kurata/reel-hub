@@ -1,0 +1,55 @@
+import httpx
+
+from app.config import FACEBOOK_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID
+
+_GRAPH_BASE = "https://graph.facebook.com/v19.0"
+_METRICS = "reach,saved,likes,comments,shares,views"
+
+
+async def get_recent_insights(limit: int = 10) -> dict:
+    if not FACEBOOK_PAGE_ACCESS_TOKEN or not INSTAGRAM_BUSINESS_ACCOUNT_ID:
+        return {"error": "missing FACEBOOK_PAGE_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID"}
+
+    token = FACEBOOK_PAGE_ACCESS_TOKEN
+    ig_id = INSTAGRAM_BUSINESS_ACCOUNT_ID
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        media_resp = await client.get(
+            f"{_GRAPH_BASE}/{ig_id}/media",
+            params={
+                "fields": "id,caption,media_type,media_product_type,timestamp,permalink",
+                "limit": limit,
+                "access_token": token,
+            },
+        )
+        media_data = media_resp.json()
+        if "error" in media_data:
+            return {"error": media_data["error"].get("message", str(media_data["error"]))}
+
+        results = []
+        for media in media_data.get("data", []):
+            media_id = media["id"]
+            ins_resp = await client.get(
+                f"{_GRAPH_BASE}/{media_id}/insights",
+                params={"metric": _METRICS, "access_token": token},
+            )
+            ins_data = ins_resp.json()
+            insights = {}
+            if "data" in ins_data:
+                for item in ins_data["data"]:
+                    name = item.get("name")
+                    values = item.get("values") or [{}]
+                    insights[name] = values[0].get("value", 0)
+            results.append(
+                {
+                    "id": media_id,
+                    "type": media.get("media_product_type") or media.get("media_type"),
+                    "timestamp": media.get("timestamp"),
+                    "permalink": media.get("permalink"),
+                    "caption": (media.get("caption") or "").splitlines()[0][:80],
+                    "insights": insights,
+                }
+            )
+
+        results.sort(key=lambda x: x["insights"].get("views", 0), reverse=True)
+        return {"count": len(results), "media": results}

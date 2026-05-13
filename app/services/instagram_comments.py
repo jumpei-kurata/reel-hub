@@ -1,4 +1,5 @@
 import json
+import random
 import time
 import unicodedata
 from pathlib import Path
@@ -9,7 +10,18 @@ from app.config import DOWNLOAD_DIR, FACEBOOK_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSIN
 
 _GRAPH_BASE = "https://graph.facebook.com/v19.0"
 _PROCESSED_FILE = Path(DOWNLOAD_DIR) / "processed_comments.json"
-_REPLY_TEXT = "🔥🔥🔥"
+_REPLY_PATTERNS = [
+    "🔥🔥🔥",
+    "🔥🔥",
+    "🔥",
+    "❤️‍🔥",
+    "😎",
+    "👏",
+    "💪",
+    "🙌",
+    "❤️",
+    "🥹",
+]
 _TTL_SECONDS = 30 * 24 * 60 * 60  # 30日
 
 
@@ -68,14 +80,14 @@ def is_emoji_only(text: str) -> bool:
     return True
 
 
-async def _already_replied(client: httpx.AsyncClient, comment_id: str, token: str) -> bool:
-    """自分がすでに🔥🔥🔥で返信済みかどうか確認（サーバー再起動後の重複返信防止）"""
+async def _already_replied(client: httpx.AsyncClient, comment_id: str, ig_id: str, token: str) -> bool:
+    """自分のIGアカウントが既にこのコメントに返信しているか確認（サーバー再起動後の重複返信防止）"""
     resp = await client.get(
         f"{_GRAPH_BASE}/{comment_id}/replies",
-        params={"fields": "text", "access_token": token},
+        params={"fields": "from", "access_token": token},
     )
     data = resp.json()
-    return any(r.get("text") == _REPLY_TEXT for r in data.get("data", []))
+    return any(r.get("from", {}).get("id") == ig_id for r in data.get("data", []))
 
 
 async def process_comments(reset: bool = False) -> dict:
@@ -130,13 +142,13 @@ async def process_comments(reset: bool = False) -> dict:
                         except Exception as e:
                             errors.append(f"like {cid}: {e}")
 
-                        # 絵文字のみなら返信（APIで重複チェック）
+                        # 絵文字のみなら返信（APIで重複チェック・パターンランダム）
                         if is_emoji_only(text):
                             try:
-                                if not await _already_replied(client, cid, token):
+                                if not await _already_replied(client, cid, ig_id, token):
                                     r = await client.post(
                                         f"{_GRAPH_BASE}/{cid}/replies",
-                                        data={"message": _REPLY_TEXT, "access_token": token},
+                                        data={"message": random.choice(_REPLY_PATTERNS), "access_token": token},
                                     )
                                     if _is_error_response(r):
                                         errors.append(_format_api_error(f"reply {cid}", r))
