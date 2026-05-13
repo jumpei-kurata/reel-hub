@@ -11,16 +11,19 @@ from app.config import DOWNLOAD_DIR, FACEBOOK_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSIN
 _GRAPH_BASE = "https://graph.facebook.com/v19.0"
 _PROCESSED_FILE = Path(DOWNLOAD_DIR) / "processed_comments.json"
 _REPLY_PATTERNS = [
-    "🔥🔥🔥",
     "🔥🔥",
-    "🔥",
-    "❤️‍🔥",
-    "😎",
-    "👏",
-    "💪",
-    "🙌",
-    "❤️",
-    "🥹",
+    "🔥🔥🔥",
+    "🔥❤️",
+    "❤️🔥",
+    "🔥😎",
+    "😎🔥",
+    "🔥👏",
+    "👏👏",
+    "🙌🔥",
+    "🙌🙌",
+    "💪🔥",
+    "❤️‍🔥🔥",
+    "🥹🔥",
 ]
 _TTL_SECONDS = 30 * 24 * 60 * 60  # 30日
 
@@ -105,7 +108,7 @@ async def process_comments(reset: bool = False) -> dict:
         )
         media_data = media_resp.json()
         if "error" in media_data:
-            return {"error": media_data["error"]["message"]}
+            return {"error": media_data["error"].get("message", str(media_data["error"]))}
 
         for media in media_data.get("data", []):
             media_id = media["id"]
@@ -116,7 +119,7 @@ async def process_comments(reset: bool = False) -> dict:
             )
             comments_data = comments_resp.json()
             if "error" in comments_data:
-                errors.append(f"media {media_id}: {comments_data['error']['message']}")
+                errors.append(f"media {media_id}: {comments_data['error'].get('message', comments_data['error'])}")
                 continue
 
             for comment in comments_data.get("data", []):
@@ -166,6 +169,9 @@ async def process_comments(reset: bool = False) -> dict:
                         params={"fields": "id,from", "access_token": token},
                     )
                     replies_data = replies_resp.json()
+                    if "error" in replies_data:
+                        errors.append(f"replies {cid}: {replies_data['error'].get('message', replies_data['error'])}")
+                        continue
                     for reply in replies_data.get("data", []):
                         rid = reply["id"]
                         if rid in processed:
