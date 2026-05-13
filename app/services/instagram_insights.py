@@ -29,12 +29,13 @@ async def _fetch_one(client: httpx.AsyncClient, media: dict, token: str) -> dict
             values = item.get("values") or [{}]
             insights[name] = values[0].get("value", 0)
 
+    caption = media.get("caption") or ""
     return {
         "id": media_id,
         "type": media.get("media_product_type") or media.get("media_type"),
         "timestamp": media.get("timestamp"),
         "permalink": media.get("permalink"),
-        "caption": (media.get("caption") or "").splitlines()[0][:80],
+        "caption": caption.split("\n", 1)[0][:80],
         "insights": insights,
     }
 
