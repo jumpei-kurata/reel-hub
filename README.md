@@ -16,7 +16,7 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 | Facebook自動投稿（URL/アップロード両対応） | ✅ 動作中 |
 | カメラロール保存（iOS Web Share API） | ✅ 動作中 |
 | Instagramへの自動投稿（アップロード時） | ⚠️ コード実装済み・H.264動画のみ対応（後述） |
-| コメント自動いいね＆絵文字返信 | ⚠️ コード実装済み・**Renderのページトークンに`instagram_manage_engagement`スコープ追加が必要**・cron-job.org設定待ち |
+| コメント自動いいね＆絵文字返信 | ⚠️ コード実装済み・**長期ユーザートークン（要 `instagram_manage_engagement`）+自動リフレッシュ運用**・cron-job.org設定待ち |
 | TikTok投稿 | ❌ 廃止（ポリシー違反・Sandbox非公開制限のため） |
 
 ### アップロード機能の既知の問題と経緯
@@ -86,8 +86,13 @@ Renderの Environment Variables に以下を設定する。
 | Key | 説明 |
 |-----|------|
 | `APP_BASE_URL` | `https://reel-hub.onrender.com` |
-| `FACEBOOK_PAGE_ACCESS_TOKEN` | 無期限ページアクセストークン（取得方法は後述） |
+| `FACEBOOK_PAGE_ACCESS_TOKEN` | 長期ユーザーアクセストークン（60日有効・自動リフレッシュ運用） |
 | `INSTAGRAM_BUSINESS_ACCOUNT_ID` | InstagramビジネスアカウントID（取得方法は後述・**未設定**） |
+| `FACEBOOK_APP_ID` | Meta AppのアプリID（自動リフレッシュ用） |
+| `FACEBOOK_APP_SECRET` | Meta Appのアプリシークレット（自動リフレッシュ用） |
+| `RENDER_API_KEY` | Render REST APIキー（自動リフレッシュ用） |
+| `RENDER_SERVICE_ID` | Render Service ID（`srv-xxxxx`、自動リフレッシュ用） |
+| `REFRESH_SECRET` | `/api/refresh-token` 認可用ランダム文字列（`openssl rand -hex 32`） |
 
 ---
 
@@ -206,6 +211,57 @@ URLを `me/accounts` にして送信。
 ### 5. Renderに設定
 
 `FACEBOOK_PAGE_ACCESS_TOKEN` に無期限トークンを設定してRedeploy。
+
+> **重要**: コメントいいね機能（`POST /{ig-user-id}/likes`）は**ページトークンでは動かない**ため、reel-hub
+> 本番では**長期ユーザートークン（60日有効）**を `FACEBOOK_PAGE_ACCESS_TOKEN` に入れる運用になっている。
+> 60日切れ防止のため次セクションの**自動リフレッシュ**を必ず設定すること。
+
+---
+
+## トークン自動リフレッシュ
+
+長期ユーザートークンは60日で失効する。これを月1回自動更新するエンドポイントとcronを用意してある。
+
+### 仕組み
+
+```
+cron-job.org（月1回POST）
+  → POST /api/refresh-token?secret=XXX
+  → fb_exchange_token で新60日トークンを取得
+  → Render API で FACEBOOK_PAGE_ACCESS_TOKEN env var を書き換え
+  → Renderが自動再デプロイ
+```
+
+### 必要な環境変数
+
+| Key | 取得方法 |
+|-----|----------|
+| `FACEBOOK_APP_ID` | Meta App Dashboard → 設定 → ベーシック |
+| `FACEBOOK_APP_SECRET` | 同上の「表示」ボタン |
+| `RENDER_API_KEY` | Render Dashboard → Account Settings → API Keys |
+| `RENDER_SERVICE_ID` | Render Dashboard サービスURL末尾の `srv-xxxxx` |
+| `REFRESH_SECRET` | `openssl rand -hex 32` で生成した任意文字列 |
+
+### cron-job.org 設定
+
+1. [cron-job.org](https://cron-job.org) でジョブ追加
+2. URL: `https://reel-hub.onrender.com/api/refresh-token?secret={REFRESH_SECRET}`
+3. Method: POST
+4. Crontab: `0 3 1 * *`（毎月1日 03:00）
+
+### 手動実行
+
+```bash
+curl -X POST "https://reel-hub.onrender.com/api/refresh-token?secret={REFRESH_SECRET}"
+# → {"refreshed": true, "expires_in_seconds": 5183944}
+```
+
+### 失敗時の対処
+
+レスポンスが `{"detail": "..."}` で500エラーなら：
+- `missing env vars: ...` → 必要なenv varが未設定
+- `fb_exchange_token: HTTP 4xx ...` → 現トークンが既に失効してる → 手動でExplorerから取り直してRender env varに貼り直し
+- `render api: HTTP 4xx ...` → `RENDER_API_KEY` か `RENDER_SERVICE_ID` の値が違う
 
 ---
 
