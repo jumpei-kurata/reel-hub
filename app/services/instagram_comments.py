@@ -117,11 +117,11 @@ async def process_comments(reset: bool = False) -> dict:
                     else:
                         text = comment.get("text", "")
 
-                        # いいね
+                        # いいね（IGはコメント側に likes エッジが無い。POST /{ig_user_id}/likes に comment_id を渡す形）
                         try:
                             r = await client.post(
-                                f"{_GRAPH_BASE}/{cid}/likes",
-                                data={"access_token": token},
+                                f"{_GRAPH_BASE}/{ig_id}/likes",
+                                data={"comment_id": cid, "access_token": token},
                             )
                             if _is_error_response(r):
                                 errors.append(_format_api_error(f"like {cid}", r))
@@ -163,8 +163,8 @@ async def process_comments(reset: bool = False) -> dict:
                             continue
                         try:
                             r = await client.post(
-                                f"{_GRAPH_BASE}/{rid}/likes",
-                                data={"access_token": token},
+                                f"{_GRAPH_BASE}/{ig_id}/likes",
+                                data={"comment_id": rid, "access_token": token},
                             )
                             if _is_error_response(r):
                                 errors.append(_format_api_error(f"like reply {rid}", r))

@@ -16,7 +16,7 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 | Facebook自動投稿（URL/アップロード両対応） | ✅ 動作中 |
 | カメラロール保存（iOS Web Share API） | ✅ 動作中 |
 | Instagramへの自動投稿（アップロード時） | ⚠️ コード実装済み・H.264動画のみ対応（後述） |
-| コメント自動いいね＆絵文字返信 | ⚠️ コード実装済み・cron-job.org設定待ち（Insta投稿確認後） |
+| コメント自動いいね＆絵文字返信 | ⚠️ コード実装済み・**Renderのページトークンに`instagram_manage_engagement`スコープ追加が必要**・cron-job.org設定待ち |
 | TikTok投稿 | ❌ 廃止（ポリシー違反・Sandbox非公開制限のため） |
 
 ### アップロード機能の既知の問題と経緯
@@ -139,7 +139,11 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 
 ### 追加で必要な権限
 
-- `instagram_manage_comments`（いいね・返信・コメント取得すべてこれ1つ）
+- `instagram_manage_comments`（コメント取得・返信）
+- `instagram_manage_engagement`（コメントいいね用、2026-04-22の新エンドポイント `POST /{ig-user-id}/likes?comment_id=...` 用）
+
+> 既存のページトークンは `instagram_manage_engagement` を含んでいないので、いいね機能を有効化するには
+> 上記権限を追加したユーザートークンから `me/accounts` で**ページトークンを取得し直す**必要がある。
 
 ### cron-job.org設定（Insta投稿が動いたら）
 
