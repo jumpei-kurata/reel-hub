@@ -16,7 +16,7 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 | Facebook自動投稿（URL/アップロード両対応） | ✅ 動作中 |
 | カメラロール保存（iOS Web Share API） | ✅ 動作中 |
 | Instagramへの自動投稿（アップロード時） | ⚠️ コード実装済み・H.264動画のみ対応（後述） |
-| コメント自動いいね＆絵文字返信 | ⚠️ コード実装済み・**長期ユーザートークン（要 `instagram_manage_engagement`）+自動リフレッシュ運用**・cron-job.org設定待ち |
+| コメント自動いいね＆絵文字返信 | ✅ 稼働中（長期ユーザートークン+月1自動リフレッシュ運用） |
 | TikTok投稿 | ❌ 廃止（ポリシー違反・Sandbox非公開制限のため） |
 
 ### アップロード機能の既知の問題と経緯
@@ -131,31 +131,51 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 
 ---
 
-## コメント自動いいね＆絵文字返信（⚠️ コード実装済み・Insta投稿確認後にcron設定）
+## コメント自動いいね＆絵文字返信（✅ 稼働中）
 
-> **無料で実装可能**。追加費用なし。
+### 動作仕様
 
-### 仕様
+最新10件のIG投稿について、コメントとその返信（2階層）をスキャンして以下を実行：
 
-- 最新10件の投稿のコメントを全取得
-- 全コメントに自動いいね
-- 絵文字のみのコメント（アルファベット・数字・CJK文字を含まない）には `🔥🔥🔥` で自動返信
-- 処理済みコメントIDは `/tmp/reel-hub/processed_comments.json` に保存（Render再起動で消えるが実害なし）
+| ケース | いいね | 絵文字返信 |
+|--------|--------|-----------|
+| 他人のトップコメント（テキスト） | ✅ | ❌ |
+| 他人のトップコメント（絵文字のみ） | ✅ | ✅ `🔥🔥🔥` |
+| 自分のトップコメント | ❌ | ❌ |
+| 他人の返信（どんな内容でも） | ✅ | ❌ |
+| 自分の返信（`🔥🔥🔥` 含む） | ❌ | ❌ |
 
-### 追加で必要な権限
+> Instagramのコメントは**2階層仕様**（トップコメント → リプライ）でリプライへのリプライは存在しないため、この2階層スキャンで全パターン網羅。
 
-- `instagram_manage_comments`（コメント取得・返信）
-- `instagram_manage_engagement`（コメントいいね用、2026-04-22の新エンドポイント `POST /{ig-user-id}/likes?comment_id=...` 用）
+### 重複防止
 
-> 既存のページトークンは `instagram_manage_engagement` を含んでいないので、いいね機能を有効化するには
-> 上記権限を追加したユーザートークンから `me/accounts` で**ページトークンを取得し直す**必要がある。
+- 処理済みID（コメント・返信どちらも）は `/tmp/reel-hub/processed_comments.json` にTTL30日のdictで保存
+- Render再起動で `/tmp/` が消えるが、`_already_replied` API チェック（返信POST時にAPI上の既存返信を確認）で重複返信は防止
+- いいねは2回POSTすると toggle で外れるが、`processed` セットでガード
 
-### cron-job.org設定（Insta投稿が動いたら）
+### 必要な権限（Render env var `FACEBOOK_PAGE_ACCESS_TOKEN` のトークンに付与済み）
 
-1. [cron-job.org](https://cron-job.org) でジョブを追加
-2. URL: `https://reel-hub.onrender.com/api/instagram/process-comments`
-3. Method: POST
-4. Crontab: `*/7 * * * *`（7分ごと）
+- `instagram_manage_comments`（コメント取得・返信POST）
+- `instagram_manage_engagement`（いいねPOST用、新エンドポイント `POST /{ig-user-id}/likes?comment_id=...`）
+
+> **ページトークンは仕様上 `/likes` で弾かれる**（scopeを持たせても認可されない、ユーザーidentityが必要なため）。
+> 本番では**長期ユーザートークン（60日有効・月1自動リフレッシュ）**を使用。
+
+### cron-job.org設定（✅ 設定済み）
+
+- Job: `reel-hub-process-comments`
+- URL: `POST https://reel-hub.onrender.com/api/instagram/process-comments`
+- 間隔: cron-job.org ダッシュボードで確認（README案では `*/7 * * * *` = 7分ごと）
+
+### 手動実行
+
+```bash
+# 通常実行（processedキャッシュを尊重）
+curl -X POST 'https://reel-hub.onrender.com/api/instagram/process-comments'
+
+# 全コメント再処理（processedキャッシュ無視）
+curl -X POST 'https://reel-hub.onrender.com/api/instagram/process-comments?reset=true'
+```
 
 ---
 
