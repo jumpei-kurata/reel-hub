@@ -539,7 +539,7 @@
     btn.disabled = false;
   }
 
-  const DEFAULT_CAPTION = '\n\n#ダンス #ブレイクダンス #dance #breakdance';
+  const DEFAULT_CAPTION = '\n\n#ダンス #ブレイクダンス #dance #breakdance ';
   document.getElementById('caption').value = DEFAULT_CAPTION;
 
   // ===== Hashtag chips =====
@@ -558,7 +558,7 @@
         ta.value = ta.value.replace(new RegExp(`\\s*#${tag}\\b`, 'gi'), '').replace(/ +/g, ' ');
       } else {
         const cur = ta.value.replace(/\s+$/, '');
-        ta.value = cur + (cur ? ' ' : '') + '#' + tag;
+        ta.value = cur + (cur ? ' ' : '') + '#' + tag + ' ';
       }
       refreshChipStates();
     });
