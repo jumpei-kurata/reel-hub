@@ -6,9 +6,12 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 
 - Instagram URLから動画をダウンロード → Facebookに投稿 & カメラロールに保存
 - ローカル動画ファイルをアップロード → Facebook & Instagramに自動投稿
-- キャプション・ハッシュタグを毎回編集可能（デフォルト: `#ダンス #ブレイクダンス #dance #breakdance #`）
+- キャプション・ハッシュタグ編集UI：4つの固定タグ事前入力 + 可変5つ目をチップタップで追加/削除
+- コメント自動いいね（他人のコメント＋返信、2階層）＋ 絵文字オンリーコメントへの13パターン絵文字ランダム返信
+- 60日有効FBトークンを月1で自動リフレッシュ（人手介入不要）
+- IG投稿パフォーマンス確認用インサイトダッシュボード（タブ統合・ソート対応）
 
-## 現在の状態（2026-05-03）
+## 現在の状態
 
 | 機能 | 状態 |
 |------|------|
@@ -16,7 +19,10 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 | Facebook自動投稿（URL/アップロード両対応） | ✅ 動作中 |
 | カメラロール保存（iOS Web Share API） | ✅ 動作中 |
 | Instagramへの自動投稿（アップロード時） | ⚠️ コード実装済み・H.264動画のみ対応（後述） |
-| コメント自動いいね＆絵文字返信 | ✅ 稼働中（長期ユーザートークン+月1自動リフレッシュ運用） |
+| コメント自動いいね＆絵文字返信 | ✅ 稼働中（cron-job.org `reel-hub-process-comments`） |
+| トークン自動リフレッシュ | ✅ 稼働中（月1 cron `reel-hub-token-refresh`） |
+| インサイトダッシュボード | ✅ 稼働中（`/` の「📊 インサイト」タブ） |
+| ハッシュタグチップ | ✅ 投稿画面に5チップ実装済み |
 | TikTok投稿 | ❌ 廃止（ポリシー違反・Sandbox非公開制限のため） |
 
 ### アップロード機能の既知の問題と経緯
@@ -87,7 +93,7 @@ Renderの Environment Variables に以下を設定する。
 |-----|------|
 | `APP_BASE_URL` | `https://reel-hub.onrender.com` |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | 長期ユーザーアクセストークン（60日有効・自動リフレッシュ運用） |
-| `INSTAGRAM_BUSINESS_ACCOUNT_ID` | InstagramビジネスアカウントID（取得方法は後述・**未設定**） |
+| `INSTAGRAM_BUSINESS_ACCOUNT_ID` | InstagramビジネスアカウントID（`17841400539477896` = Jumpei-Dance） |
 | `FACEBOOK_APP_ID` | Meta AppのアプリID（自動リフレッシュ用） |
 | `FACEBOOK_APP_SECRET` | Meta Appのアプリシークレット（自動リフレッシュ用） |
 | `RENDER_API_KEY` | Render REST APIキー（自動リフレッシュ用） |
@@ -96,16 +102,10 @@ Renderの Environment Variables に以下を設定する。
 
 ---
 
-## Instagram自動投稿セットアップ（⚠️ 後日作業）
+## Instagram自動投稿セットアップ（✅ 完了済み）
 
-> コードは実装済み。以下の手順を完了すれば動作する。
-
-### 作業ステータス
-
-- [x] バックエンド実装（`app/services/instagram.py`, `app/routes/instagram.py`）
-- [x] フロントエンド実装（アップロード時のみ自動投稿ボタンに切り替わる）
-- [ ] Meta AppにInstagram権限を追加
-- [ ] InstagramビジネスアカウントIDを取得してRenderに設定
+> **セットアップ完了**。`INSTAGRAM_BUSINESS_ACCOUNT_ID=17841400539477896` がRenderに設定済み。
+> 以下は手順の参考記録。
 
 ### 1. Meta AppにInstagram権限を追加
 
@@ -117,10 +117,10 @@ Renderの Environment Variables に以下を設定する。
 
 ### 2. INSTAGRAM_BUSINESS_ACCOUNT_IDを取得
 
-グラフAPIエクスプローラーで以下を実行（`FACEBOOK_PAGE_ACCESS_TOKEN`が必要）：
+グラフAPIエクスプローラーで以下を実行（ユーザートークンが必要）：
 
 ```
-GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
+GET /me/accounts?fields=name,instagram_business_account{id,username}
 ```
 
 レスポンスの `instagram_business_account.id` の値をコピー。
@@ -128,6 +128,38 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 ### 3. Renderに環境変数を設定
 
 `INSTAGRAM_BUSINESS_ACCOUNT_ID` に取得したIDを設定 → Redeploy。
+
+---
+
+## 投稿画面のキャプションUI
+
+### デフォルトキャプション
+
+```
+\n\n#ダンス #ブレイクダンス #dance #breakdance 
+```
+
+末尾に半角スペース付き（次のタグを書き始めやすいように）。
+
+### ハッシュタグチップ
+
+textarea の下に並ぶチップボタンで、可変位置のハッシュタグをタップで追加/削除：
+
+| チップ | 用途 |
+|--------|------|
+| `#powermoves` | パワームーブ系の動画 |
+| `#training` | 練習風景 |
+| `#workout` | ワークアウト・体作り系 |
+| `#breakin` | ブレイキン全般 |
+| `#bboy` | Bボーイング |
+
+- **タップで追加** → 紫ハイライト
+- **再タップで削除** → 文中の該当 `#tag` を削除
+- **手動編集と同期** → textarea に直接書いてもチップ状態が反映される
+
+### 追加方法
+
+`app/static/index.html` の `<div class="chips" id="hashtag-chips">` 内に `<button class="chip" type="button" data-tag="newtag">#newtag</button>` を1行足すだけ。`data-tag` の値（`#` 抜き）がそのまま追加されるタグ名になる。
 
 ---
 
@@ -165,7 +197,7 @@ GET /{facebook_page_id}?fields=instagram_business_account&access_token={token}
 
 - Job: `reel-hub-process-comments`
 - URL: `POST https://reel-hub.onrender.com/api/instagram/process-comments`
-- 間隔: cron-job.org ダッシュボードで確認（README案では `*/7 * * * *` = 7分ごと）
+- 間隔: cron-job.org ダッシュボードで管理（推奨: `*/7 * * * *` = 7分ごと）
 
 ### 手動実行
 
@@ -229,32 +261,31 @@ curl 'https://reel-hub.onrender.com/api/insights?secret={REFRESH_SECRET}&limit=2
 
 ---
 
-## Facebook ページアクセストークンの取得
+## Facebookアクセストークンの取得（初回のみ）
 
-> **ポイント**: Graph APIエクスプローラーで生成したトークンは約1時間で失効する。
-> 長期トークン経由でページトークンを取得すると**無期限**になる。
+> **背景**: 本番では**長期ユーザートークン（60日有効）**を `FACEBOOK_PAGE_ACCESS_TOKEN` に保存。
+> 60日切れは次セクションの**自動リフレッシュ**で月1更新するため、初回1回だけ手動で取得が必要。
+>
+> ※ かつてページトークン（無期限）を使っていたが、コメントいいねの新エンドポイント
+> `POST /{ig-user-id}/likes` がページトークンでは認可されないため、ユーザートークン経路に移行。
 
-### 1. Meta Developerでアプリ作成
+### 1. Meta Developer でアプリ準備
 
-1. [developers.facebook.com](https://developers.facebook.com) → マイアプリ → アプリを作成
-2. 「ユースケースなしでアプリを作成」を選択
-3. アプリ作成後、**ユースケース → カスタマイズ** から以下を追加：
-   - `pages_read_engagement`（先に追加）
-   - `pages_manage_posts`（後に追加）
-
-> **注意**: `pages_manage_posts` を追加すると `pages_read_engagement` が依存関係として必要になる。必ず `pages_read_engagement` を先に追加すること。
+1. [developers.facebook.com](https://developers.facebook.com) → マイアプリ → アプリを作成（既存ならスキップ）
+2. **ユースケース → カスタマイズ** で以下のスコープを追加：
+   - Page Management: `business_management`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_manage_posts`, `pages_read_engagement`, `pages_read_user_content`, `pages_show_list`, `read_insights`
+   - Instagram API: `instagram_basic`, `instagram_content_publish`, `instagram_manage_comments`, `instagram_manage_engagement`, `instagram_manage_insights`, `instagram_manage_messages`
 
 ### 2. 短命ユーザートークンを生成
 
 1. **ツール → グラフAPIエクスプローラー**
 2. Metaアプリ: `reel-hub` を選択
-3. アクセス許可に `pages_manage_posts`、`pages_show_list` を追加
-4. **「Generate Access Token」** を押してFacebookでログイン・許可
-5. 生成されたトークンをコピー（これは短命トークン）
+3. **User or Page** → `ユーザートークン`
+4. アクセス許可：①で追加した全スコープにチェック
+5. **Generate Access Token** → Facebookログイン・全許可
+6. 生成されたトークンをコピー（これは1時間で失効する短命トークン）
 
-> **注意**: Graph APIエクスプローラーは個人プロフィールではなくページに切り替えてから操作すること。
-
-### 3. 長期トークンに交換（60日→ページトークンは無期限）
+### 3. 長期トークンに交換（60日有効）
 
 ブラウザで以下のURLにアクセス（値を置き換えて）：
 
@@ -266,25 +297,13 @@ https://graph.facebook.com/v19.0/oauth/access_token
   &fb_exchange_token={短命トークン}
 ```
 
-レスポンスの `access_token` が長期ユーザートークン。
+レスポンスの `access_token` が**長期ユーザートークン**（60日有効）。
 
-### 4. 無期限ページアクセストークンを取得
+### 4. Renderに設定
 
-グラフAPIエクスプローラーのアクセストークン欄に長期ユーザートークンを貼り付けて、
-URLを `me/accounts` にして送信。
+`FACEBOOK_PAGE_ACCESS_TOKEN` に長期ユーザートークンを設定 → 自動Redeploy。
 
-レスポンスのページ一覧から自分のページの `access_token` をコピー。
-**これが無期限のページアクセストークン。**
-
-> **補足**: `me/accounts` を叩くたびにトークンが変わるように見えるが、同じトークンが返ってくるのが正常。毎回コピーし直す必要はない。
-
-### 5. Renderに設定
-
-`FACEBOOK_PAGE_ACCESS_TOKEN` に無期限トークンを設定してRedeploy。
-
-> **重要**: コメントいいね機能（`POST /{ig-user-id}/likes`）は**ページトークンでは動かない**ため、reel-hub
-> 本番では**長期ユーザートークン（60日有効）**を `FACEBOOK_PAGE_ACCESS_TOKEN` に入れる運用になっている。
-> 60日切れ防止のため次セクションの**自動リフレッシュ**を必ず設定すること。
+以降は次セクションの**自動リフレッシュ**が月1で動くため、手動更新は不要。
 
 ---
 
@@ -335,10 +354,10 @@ curl -X POST "https://reel-hub.onrender.com/api/refresh-token?secret={REFRESH_SE
 
 ---
 
-## TikTok セットアップ
+## TikTok セットアップ（❌ 廃止・歴史的記録）
 
-> **現状（2026年5月時点）**: App Reviewに申請済み。審査通過後に本番利用可能になる。
-> 審査中はSandbox環境でのみテスト可能。
+> **TikTok統合は廃止しました**（コミット `3292bb6` で削除）。Sandbox外で公開できない制約 + ポリシー違反通知のため。
+> 以下は過去に試したセットアップ手順の保存。再挑戦する人向けの参考情報。
 
 ### 1. Developer登録・アプリ作成
 
