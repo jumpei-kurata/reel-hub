@@ -185,9 +185,9 @@ curl -X POST 'https://reel-hub.onrender.com/api/instagram/process-comments?reset
 
 ### UIダッシュボード
 
-ブラウザで開く: **https://reel-hub.onrender.com/insights.html**
+**メインページ https://reel-hub.onrender.com/ の「📊 インサイト」タブから利用**。
 
-初回 `REFRESH_SECRET` を入力すると `localStorage` に保存され、以降は自動ロード。再生数/リーチ/いいね/コメント/保存/シェア/新着 でソート切替可能。各カードからInstagram投稿へワンタップ遷移。
+初回 `REFRESH_SECRET` を入力すると `localStorage` に保存され、以降タブを切り替えるだけで自動ロード。再生数/リーチ/いいね/コメント/保存/シェア/新着 でソート切替可能。各カードからInstagram投稿へワンタップ遷移。
 
 ### エンドポイント（curl版）
 

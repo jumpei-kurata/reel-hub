@@ -89,6 +89,64 @@
       border-radius: 50%; animation: spin .7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Tabs */
+    .tabs {
+      display: flex; background: var(--card);
+      border-bottom: 1px solid var(--border); padding: 0 16px;
+    }
+    .tab {
+      flex: 1; padding: 12px 0; border: none; background: transparent;
+      color: var(--sub); font-size: 14px; font-weight: 600; cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab.active { color: var(--text); border-bottom-color: var(--primary); }
+
+    /* Insights */
+    .insights-row { display: flex; gap: 8px; margin-top: 10px; }
+    .insights-row .sort-select {
+      flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 8px; font-size: 13px; font-family: inherit;
+      -webkit-appearance: none;
+    }
+    .insights-row input[type=number] {
+      width: 56px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-size: 14px; padding: 11px 6px; outline: none;
+      -webkit-appearance: none; font-family: inherit; text-align: center;
+    }
+    .insights-row .btn { margin: 0; flex-shrink: 0; padding: 11px 16px; width: auto; }
+    input[type=password] {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-size: 14px; padding: 11px 12px; outline: none;
+      -webkit-appearance: none; font-family: inherit;
+    }
+    input[type=password]:focus { border-color: var(--primary); }
+    .post-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 12px; margin-bottom: 10px; display: flex; gap: 12px;
+    }
+    .post-card .thumb {
+      width: 88px; height: 88px; border-radius: 10px; flex-shrink: 0;
+      background: var(--bg); overflow: hidden; position: relative;
+    }
+    .post-card .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .post-card .thumb .badge {
+      position: absolute; top: 4px; left: 4px;
+      background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.4px; color: #fff;
+    }
+    .post-card .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .post-card .meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .post-card .date { font-size: 11px; color: var(--sub); }
+    .post-card .open { font-size: 11px; color: var(--primary); text-decoration: none; }
+    .post-card .caption { font-size: 13px; line-height: 1.4; color: var(--text); margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .post-card .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: auto; }
+    .post-card .metric { display: flex; flex-direction: column; gap: 1px; }
+    .post-card .metric .v { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.1; }
+    .post-card .metric .k { font-size: 9px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+    .empty { color: var(--sub); text-align: center; padding: 40px 16px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -100,7 +158,13 @@
   </div>
 </header>
 
+<nav class="tabs">
+  <button class="tab active" data-tab="post">🎬 投稿</button>
+  <button class="tab" data-tab="insights">📊 インサイト</button>
+</nav>
+
 <main>
+<section id="tab-post">
   <div class="card">
     <label>Instagram URL</label>
     <input type="url" id="url" placeholder="https://www.instagram.com/reel/..."
@@ -141,6 +205,28 @@
       </div>
     </div>
   </div>
+</section>
+
+<section id="tab-insights" class="hidden">
+  <div class="card">
+    <label>REFRESH_SECRET</label>
+    <input type="password" id="insights-secret" placeholder="64文字のhex" autocomplete="off">
+    <div class="insights-row">
+      <select class="sort-select" id="insights-sort">
+        <option value="views">📺 再生数順</option>
+        <option value="reach">🎯 リーチ順</option>
+        <option value="likes">❤️ いいね順</option>
+        <option value="comments">💬 コメント順</option>
+        <option value="saved">🔖 保存順</option>
+        <option value="shares">↗️ シェア順</option>
+        <option value="timestamp">🕒 新しい順</option>
+      </select>
+      <input type="number" id="insights-limit" value="10" min="1" max="25">
+      <button class="btn btn-primary" id="insights-load">Load</button>
+    </div>
+  </div>
+  <div id="insights-content"></div>
+</section>
 </main>
 
 <footer id="status">準備完了</footer>
@@ -149,6 +235,113 @@
   let videoId = null;
   let videoSource = null; // 'download' | 'upload'
   let instagramConfigured = false;
+
+  // ===== Tabs =====
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.tab;
+      document.getElementById('tab-post').classList.toggle('hidden', target !== 'post');
+      document.getElementById('tab-insights').classList.toggle('hidden', target !== 'insights');
+      if (target === 'insights' && !insightsData && document.getElementById('insights-secret').value) {
+        loadInsights();
+      }
+    });
+  });
+
+  // ===== Insights =====
+  const INSIGHTS_KEY = 'reel_hub_insights_secret';
+  let insightsData = null;
+
+  function fmtNum(n) {
+    if (n == null) return '–';
+    if (n >= 10000) return (n / 1000).toFixed(1) + 'k';
+    return String(n);
+  }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return 'たった今';
+    if (diff < 3600) return Math.floor(diff / 60) + '分前';
+    if (diff < 86400) return Math.floor(diff / 3600) + '時間前';
+    if (diff < 86400 * 30) return Math.floor(diff / 86400) + '日前';
+    return d.toLocaleDateString('ja-JP');
+  }
+  function escapeHtml(s) {
+    return (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderInsights() {
+    if (!insightsData) return;
+    const sortKey = document.getElementById('insights-sort').value;
+    const items = [...insightsData.media];
+    items.sort((a, b) => {
+      if (sortKey === 'timestamp') return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+      return ((b.insights && b.insights[sortKey]) || 0) - ((a.insights && a.insights[sortKey]) || 0);
+    });
+    const el = document.getElementById('insights-content');
+    if (items.length === 0) { el.innerHTML = '<div class="empty">投稿がありません</div>'; return; }
+    el.innerHTML = items.map(m => {
+      const ins = m.insights || {};
+      const err = ins._error;
+      return `
+        <article class="post-card">
+          <div class="thumb">
+            ${m.thumbnail_url ? `<img src="${escapeHtml(m.thumbnail_url)}" loading="lazy" alt="">` : ''}
+            <span class="badge">${escapeHtml(m.type || '')}</span>
+          </div>
+          <div class="info">
+            <div class="meta">
+              <span class="date">${escapeHtml(fmtDate(m.timestamp))}</span>
+              ${m.permalink ? `<a class="open" href="${escapeHtml(m.permalink)}" target="_blank" rel="noopener">開く ↗</a>` : ''}
+            </div>
+            <div class="caption">${escapeHtml(m.caption) || '<span style="color:var(--sub)">(無題)</span>'}</div>
+            <div class="metrics">
+              <div class="metric"><span class="v">${fmtNum(ins.views)}</span><span class="k">📺 再生</span></div>
+              <div class="metric"><span class="v">${fmtNum(ins.reach)}</span><span class="k">🎯 リーチ</span></div>
+              <div class="metric"><span class="v">${fmtNum(ins.likes)}</span><span class="k">❤️ いいね</span></div>
+              <div class="metric"><span class="v">${fmtNum(ins.comments)}</span><span class="k">💬 コメント</span></div>
+              <div class="metric"><span class="v">${fmtNum(ins.saved)}</span><span class="k">🔖 保存</span></div>
+              <div class="metric"><span class="v">${fmtNum(ins.shares)}</span><span class="k">↗️ シェア</span></div>
+              ${err ? `<div style="grid-column:1/-1;font-size:10px;color:var(--error);margin-top:4px">⚠ ${escapeHtml(err)}</div>` : ''}
+            </div>
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  async function loadInsights() {
+    const secret = document.getElementById('insights-secret').value.trim();
+    const limit = Math.max(1, Math.min(25, parseInt(document.getElementById('insights-limit').value || '10', 10)));
+    if (!secret) {
+      document.getElementById('insights-content').innerHTML = '<div class="empty">REFRESH_SECRETを入力してください</div>';
+      return;
+    }
+    localStorage.setItem(INSIGHTS_KEY, secret);
+    document.getElementById('insights-content').innerHTML = '<div class="empty"><span class="spin"></span>取得中…</div>';
+    try {
+      const r = await fetch(`/api/insights?secret=${encodeURIComponent(secret)}&limit=${limit}`);
+      if (!r.ok) {
+        const errBody = await r.json().catch(() => ({}));
+        document.getElementById('insights-content').innerHTML = `<div class="empty" style="color:var(--error)">HTTP ${r.status}: ${escapeHtml(errBody.detail || r.statusText)}</div>`;
+        return;
+      }
+      insightsData = await r.json();
+      renderInsights();
+    } catch (e) {
+      document.getElementById('insights-content').innerHTML = `<div class="empty" style="color:var(--error)">取得失敗: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  document.getElementById('insights-load').addEventListener('click', loadInsights);
+  document.getElementById('insights-secret').addEventListener('keydown', e => { if (e.key === 'Enter') loadInsights(); });
+  document.getElementById('insights-sort').addEventListener('change', renderInsights);
+
+  const _storedSecret = localStorage.getItem(INSIGHTS_KEY);
+  if (_storedSecret) document.getElementById('insights-secret').value = _storedSecret;
 
   async function checkStatus() {
     try {
