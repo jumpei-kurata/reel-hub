@@ -35,6 +35,7 @@ async def _fetch_one(client: httpx.AsyncClient, media: dict, token: str) -> dict
         "type": media.get("media_product_type") or media.get("media_type"),
         "timestamp": media.get("timestamp"),
         "permalink": media.get("permalink"),
+        "thumbnail_url": media.get("thumbnail_url") or media.get("media_url"),
         "caption": caption.split("\n", 1)[0][:80],
         "insights": insights,
     }
@@ -51,7 +52,7 @@ async def get_recent_insights(limit: int = 10) -> dict:
         media_resp = await client.get(
             f"{_GRAPH_BASE}/{ig_id}/media",
             params={
-                "fields": "id,caption,media_type,media_product_type,timestamp,permalink",
+                "fields": "id,caption,media_type,media_product_type,timestamp,permalink,thumbnail_url,media_url",
                 "limit": limit,
                 "access_token": token,
             },

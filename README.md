@@ -183,7 +183,13 @@ curl -X POST 'https://reel-hub.onrender.com/api/instagram/process-comments?reset
 
 最新N件のIG投稿のリーチ・保存・いいね・コメント・シェア・再生数を取得して、再生数順に並べる。
 
-### エンドポイント
+### UIダッシュボード
+
+ブラウザで開く: **https://reel-hub.onrender.com/insights.html**
+
+初回 `REFRESH_SECRET` を入力すると `localStorage` に保存され、以降は自動ロード。再生数/リーチ/いいね/コメント/保存/シェア/新着 でソート切替可能。各カードからInstagram投稿へワンタップ遷移。
+
+### エンドポイント（curl版）
 
 ```bash
 # デフォルト10件
