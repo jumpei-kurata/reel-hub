@@ -147,6 +147,18 @@
     .post-card .metric .v { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.1; }
     .post-card .metric .k { font-size: 9px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
     .empty { color: var(--sub); text-align: center; padding: 40px 16px; font-size: 14px; }
+
+    /* Hashtag chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+    .chip {
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--sub); padding: 8px 14px; border-radius: 16px;
+      font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .chip:active { transform: scale(0.95); }
+    .chip.added { background: var(--primary); color: #fff; border-color: var(--primary); }
   </style>
 </head>
 <body>
@@ -197,6 +209,13 @@
     <div class="card">
       <label>キャプション / ハッシュタグ</label>
       <textarea id="caption"></textarea>
+      <div class="chips" id="hashtag-chips">
+        <button class="chip" type="button" data-tag="powermoves">#powermoves</button>
+        <button class="chip" type="button" data-tag="training">#training</button>
+        <button class="chip" type="button" data-tag="workout">#workout</button>
+        <button class="chip" type="button" data-tag="breakin">#breakin</button>
+        <button class="chip" type="button" data-tag="bboy">#bboy</button>
+      </div>
       <div class="actions">
         <button class="btn btn-post" id="btn-post" onclick="postAndSave()">
           Facebookに投稿 & カメラロールに保存
@@ -520,8 +539,32 @@
     btn.disabled = false;
   }
 
-  const DEFAULT_CAPTION = '\n\n#ダンス #ブレイクダンス #dance #breakdance #';
+  const DEFAULT_CAPTION = '\n\n#ダンス #ブレイクダンス #dance #breakdance';
   document.getElementById('caption').value = DEFAULT_CAPTION;
+
+  // ===== Hashtag chips =====
+  function refreshChipStates() {
+    const text = document.getElementById('caption').value;
+    document.querySelectorAll('#hashtag-chips .chip').forEach(chip => {
+      const tag = chip.dataset.tag;
+      chip.classList.toggle('added', new RegExp(`#${tag}\\b`, 'i').test(text));
+    });
+  }
+  document.querySelectorAll('#hashtag-chips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const tag = chip.dataset.tag;
+      const ta = document.getElementById('caption');
+      if (chip.classList.contains('added')) {
+        ta.value = ta.value.replace(new RegExp(`\\s*#${tag}\\b`, 'gi'), '').replace(/ +/g, ' ');
+      } else {
+        const cur = ta.value.replace(/\s+$/, '');
+        ta.value = cur + (cur ? ' ' : '') + '#' + tag;
+      }
+      refreshChipStates();
+    });
+  });
+  document.getElementById('caption').addEventListener('input', refreshChipStates);
+  refreshChipStates();
 
   document.getElementById('url').addEventListener('keydown', e => {
     if (e.key === 'Enter') startDownload();
