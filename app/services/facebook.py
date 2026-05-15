@@ -21,6 +21,8 @@ def _is_token_error(resp: httpx.Response) -> bool:
 async def _get_page_access_token(client: httpx.AsyncClient, user_token: str, page_id: str) -> str:
     if page_id in _page_token_cache:
         return _page_token_cache[page_id]
+
+    # /me/accounts（クラシックPage向け）。新フォーマット Business Portfolio Page は出ないことがある
     r = await client.get(
         f"{_GRAPH_BASE}/me/accounts",
         params={"fields": "id,access_token", "access_token": user_token},
@@ -34,7 +36,22 @@ async def _get_page_access_token(client: httpx.AsyncClient, user_token: str, pag
                 raise RuntimeError(f"Page {page_id} に access_token が含まれていません")
             _page_token_cache[page_id] = token
             return token
-    raise RuntimeError(f"ユーザートークンから Page {page_id} のトークンを取得できませんでした")
+
+    # フォールバック: Page を直接叩いて access_token を取得（新フォーマットPage対策）
+    r2 = await client.get(
+        f"{_GRAPH_BASE}/{page_id}",
+        params={"fields": "access_token", "access_token": user_token},
+    )
+    if r2.status_code == 200:
+        token = r2.json().get("access_token")
+        if token:
+            _page_token_cache[page_id] = token
+            return token
+
+    raise RuntimeError(
+        f"ユーザートークンから Page {page_id} のトークンを取得できませんでした "
+        f"(/me/accounts に未含・/{page_id} fallback も失敗 [{r2.status_code}] {r2.text[:200]})"
+    )
 
 
 async def post_video(video_path: str, message: str) -> dict:
