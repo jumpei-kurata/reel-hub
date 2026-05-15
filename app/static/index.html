@@ -204,6 +204,19 @@
     </div>
   </div>
 
+  <div class="card">
+    <label>キャプション / ハッシュタグ</label>
+    <textarea id="caption"></textarea>
+    <div class="chips" id="hashtag-chips">
+      <button class="chip" type="button" data-tag="powermoves">#powermoves</button>
+      <button class="chip" type="button" data-tag="training">#training</button>
+      <button class="chip" type="button" data-tag="workout">#workout</button>
+      <button class="chip" type="button" data-tag="breakin">#breakin</button>
+      <button class="chip" type="button" data-tag="bboy">#bboy</button>
+    </div>
+    <button class="btn btn-copy" type="button" id="btn-copy-caption" onclick="copyCaption()">📋 全文コピー</button>
+  </div>
+
   <div id="section-result" class="hidden">
     <div class="card">
       <label>プレビュー</label>
@@ -211,17 +224,7 @@
     </div>
 
     <div class="card">
-      <label>キャプション / ハッシュタグ</label>
-      <textarea id="caption"></textarea>
-      <div class="chips" id="hashtag-chips">
-        <button class="chip" type="button" data-tag="powermoves">#powermoves</button>
-        <button class="chip" type="button" data-tag="training">#training</button>
-        <button class="chip" type="button" data-tag="workout">#workout</button>
-        <button class="chip" type="button" data-tag="breakin">#breakin</button>
-        <button class="chip" type="button" data-tag="bboy">#bboy</button>
-      </div>
-      <button class="btn btn-copy" type="button" id="btn-copy-caption" onclick="copyCaption()">📋 全文コピー</button>
-      <div class="actions">
+      <div class="actions" style="margin-top:0">
         <button class="btn btn-post" id="btn-post" onclick="postAndSave()">
           Facebookに投稿 & カメラロールに保存
         </button>
