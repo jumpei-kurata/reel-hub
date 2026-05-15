@@ -37,7 +37,7 @@ async def _get_page_access_token(client: httpx.AsyncClient, user_token: str, pag
             _page_token_cache[page_id] = token
             return token
 
-    # フォールバック: Page を直接叩いて access_token を取得（新フォーマットPage対策）
+    # フォールバック1: Page を直接叩いて access_token を取得（新フォーマットPage対策）
     r2 = await client.get(
         f"{_GRAPH_BASE}/{page_id}",
         params={"fields": "access_token", "access_token": user_token},
@@ -48,9 +48,34 @@ async def _get_page_access_token(client: httpx.AsyncClient, user_token: str, pag
             _page_token_cache[page_id] = token
             return token
 
+    # フォールバック2: /me/businesses → /{business-id}/owned_pages（Business Portfolio 配下のPage対策）
+    r3 = await client.get(
+        f"{_GRAPH_BASE}/me/businesses",
+        params={"fields": "id", "access_token": user_token},
+    )
+    if r3.status_code == 200:
+        for biz in r3.json().get("data", []):
+            biz_id = biz.get("id")
+            if not biz_id:
+                continue
+            for edge in ("owned_pages", "client_pages"):
+                r4 = await client.get(
+                    f"{_GRAPH_BASE}/{biz_id}/{edge}",
+                    params={"fields": "id,access_token", "access_token": user_token},
+                )
+                if r4.status_code != 200:
+                    continue
+                for page in r4.json().get("data", []):
+                    if page.get("id") == page_id:
+                        token = page.get("access_token")
+                        if token:
+                            _page_token_cache[page_id] = token
+                            return token
+
     raise RuntimeError(
         f"ユーザートークンから Page {page_id} のトークンを取得できませんでした "
-        f"(/me/accounts に未含・/{page_id} fallback も失敗 [{r2.status_code}] {r2.text[:200]})"
+        f"(/me/accounts・/{page_id} 直接・/me/businesses 全部失敗。"
+        f"直接fetchエラー: [{r2.status_code}] {r2.text[:150]})"
     )
 
 

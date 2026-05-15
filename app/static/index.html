@@ -219,7 +219,7 @@
       </div>
       <div class="actions">
         <button class="btn btn-post" id="btn-post" onclick="postAndSave()">
-          Facebookに投稿 & カメラロールに保存
+          FB投稿 + カメラロール保存 + キャプションコピー
         </button>
         <p id="post-hint" style="font-size:11px;color:var(--sub);text-align:center;margin-top:-4px">共有シートが開いたら「ビデオを保存」をタップ</p>
       </div>
@@ -376,10 +376,12 @@
     const btn = document.getElementById('btn-post');
     const hint = document.getElementById('post-hint');
     if (videoSource === 'upload') {
-      btn.textContent = instagramConfigured ? 'Facebook & Instagramに投稿' : 'Facebookに投稿';
+      btn.textContent = instagramConfigured
+        ? 'FB+IG投稿 + キャプションコピー'
+        : 'FB投稿 + キャプションコピー';
       hint.textContent = instagramConfigured ? '' : '※ Instagram未設定（INSTAGRAM_BUSINESS_ACCOUNT_IDが必要）';
     } else {
-      btn.textContent = 'Facebookに投稿 & カメラロールに保存';
+      btn.textContent = 'FB投稿 + カメラロール保存 + キャプションコピー';
       hint.textContent = '共有シートが開いたら「ビデオを保存」をタップ';
     }
   }
