@@ -93,6 +93,7 @@ Renderの Environment Variables に以下を設定する。
 |-----|------|
 | `APP_BASE_URL` | `https://reel-hub.onrender.com` |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | 長期ユーザーアクセストークン（60日有効・自動リフレッシュ運用） |
+| `FACEBOOK_PAGE_ID` | 投稿先 Facebook Page ID。動画投稿時に `/me/accounts` から Page トークンを引いて `/{page-id}/videos` を叩く |
 | `INSTAGRAM_BUSINESS_ACCOUNT_ID` | InstagramビジネスアカウントID（`17841400539477896` = Jumpei-Dance） |
 | `FACEBOOK_APP_ID` | Meta AppのアプリID（自動リフレッシュ用） |
 | `FACEBOOK_APP_SECRET` | Meta Appのアプリシークレット（自動リフレッシュ用） |
@@ -299,9 +300,22 @@ https://graph.facebook.com/v19.0/oauth/access_token
 
 レスポンスの `access_token` が**長期ユーザートークン**（60日有効）。
 
-### 4. Renderに設定
+### 4. Page IDを取得
 
-`FACEBOOK_PAGE_ACCESS_TOKEN` に長期ユーザートークンを設定 → 自動Redeploy。
+ブラウザで以下にアクセスして、投稿先 Facebook Page の `id` を控える（値を置き換え）：
+
+```
+https://graph.facebook.com/v19.0/me/accounts?fields=id,name&access_token={長期ユーザートークン}
+```
+
+レスポンス `data[].id` が **Facebook Page ID**。投稿したい Page の id を控える。
+
+### 5. Renderに設定
+
+以下を Render の Environment Variables に設定 → 自動 Redeploy：
+
+- `FACEBOOK_PAGE_ACCESS_TOKEN` ← 長期ユーザートークン
+- `FACEBOOK_PAGE_ID` ← 上で取得した Page ID
 
 以降は次セクションの**自動リフレッシュ**が月1で動くため、手動更新は不要。
 

@@ -10,6 +10,7 @@ from app.config import (
 
 _FB_BASE = "https://graph.facebook.com/v19.0"
 _RENDER_BASE = "https://api.render.com/v1"
+# 歴史的経緯で env var 名は "PAGE" だが、実体は長期ユーザートークン（IGコメントいいねがページトークンで認可されないため移行）
 _ENV_VAR_KEY = "FACEBOOK_PAGE_ACCESS_TOKEN"
 
 

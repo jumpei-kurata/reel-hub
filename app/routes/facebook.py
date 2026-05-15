@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.config import FACEBOOK_PAGE_ACCESS_TOKEN
+from app.config import FACEBOOK_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID
 from app.services.downloader import get_video_path
 from app.services.facebook import post_video
 
@@ -21,6 +21,8 @@ class FacebookPostRequest(BaseModel):
 async def post_to_facebook(req: FacebookPostRequest):
     if not FACEBOOK_PAGE_ACCESS_TOKEN:
         raise HTTPException(status_code=503, detail="Facebookが設定されていません")
+    if not FACEBOOK_PAGE_ID:
+        raise HTTPException(status_code=503, detail="FACEBOOK_PAGE_IDが設定されていません")
     if not _UUID_RE.match(req.video_id):
         raise HTTPException(status_code=400, detail="Invalid video ID")
     try:

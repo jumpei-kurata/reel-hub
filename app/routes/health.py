@@ -14,7 +14,7 @@ async def ping():
 @router.get("/auth/status")
 async def auth_status():
     return {
-        "facebook_configured": bool(os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")),
+        "facebook_configured": bool(os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")) and bool(os.getenv("FACEBOOK_PAGE_ID")),
         "instagram_configured": bool(os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")),
     }
 
