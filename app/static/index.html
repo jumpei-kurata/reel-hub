@@ -62,9 +62,6 @@
     .btn:disabled { opacity: 0.35; cursor: default; }
     .btn-primary { background: var(--primary); color: #fff; margin-top: 12px; }
     .btn-post { background: #1877f2; color: #fff; }
-    .btn-copy { background: var(--bg); color: var(--text); border: 1px solid var(--border); margin-top: 10px; padding: 11px; font-size: 13px; }
-    .btn-copy.copied { background: var(--success); border-color: var(--success); color: #fff; }
-    .btn-copy.failed { background: var(--error); border-color: var(--error); color: #fff; }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
     .divider { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; color: var(--sub); font-size: 12px; }
     .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -204,19 +201,6 @@
     </div>
   </div>
 
-  <div class="card">
-    <label>キャプション / ハッシュタグ</label>
-    <textarea id="caption"></textarea>
-    <div class="chips" id="hashtag-chips">
-      <button class="chip" type="button" data-tag="powermoves">#powermoves</button>
-      <button class="chip" type="button" data-tag="training">#training</button>
-      <button class="chip" type="button" data-tag="workout">#workout</button>
-      <button class="chip" type="button" data-tag="breakin">#breakin</button>
-      <button class="chip" type="button" data-tag="bboy">#bboy</button>
-    </div>
-    <button class="btn btn-copy" type="button" id="btn-copy-caption" onclick="copyCaption()">📋 全文コピー</button>
-  </div>
-
   <div id="section-result" class="hidden">
     <div class="card">
       <label>プレビュー</label>
@@ -224,7 +208,16 @@
     </div>
 
     <div class="card">
-      <div class="actions" style="margin-top:0">
+      <label>キャプション / ハッシュタグ</label>
+      <textarea id="caption"></textarea>
+      <div class="chips" id="hashtag-chips">
+        <button class="chip" type="button" data-tag="powermoves">#powermoves</button>
+        <button class="chip" type="button" data-tag="training">#training</button>
+        <button class="chip" type="button" data-tag="workout">#workout</button>
+        <button class="chip" type="button" data-tag="breakin">#breakin</button>
+        <button class="chip" type="button" data-tag="bboy">#bboy</button>
+      </div>
+      <div class="actions">
         <button class="btn btn-post" id="btn-post" onclick="postAndSave()">
           Facebookに投稿 & カメラロールに保存
         </button>
@@ -459,6 +452,13 @@
     const btn = document.getElementById('btn-post');
     btn.disabled = true;
 
+    // キャプションをbest-effortでクリップボードにコピー（ユーザージェスチャー保持のため await せず即発火）
+    const captionCopyPromise = (navigator.clipboard && window.isSecureContext)
+      ? navigator.clipboard.writeText(caption).then(() => true).catch(() => false)
+      : Promise.resolve(false);
+
+    const copySuffix = async () => (await captionCopyPromise) ? ' & コピー済み' : '';
+
     if (videoSource === 'upload') {
       // アップロード元: Facebook + Instagram に投稿
       setStatus('Facebook & Instagramに投稿中...', 'loading');
@@ -481,7 +481,7 @@
         const igOk = igResult.status === 'fulfilled';
 
         if (fbOk && igOk) {
-          setStatus('Facebook & Instagram投稿完了 ✓', 'success');
+          setStatus(`Facebook & Instagram投稿完了${await copySuffix()} ✓`, 'success');
         } else if (fbOk) {
           setStatus(`Facebook投稿完了 / Instagramエラー: ${igResult.reason.message}`, 'error');
         } else if (igOk) {
@@ -493,7 +493,7 @@
         // Instagram未設定: Facebookのみ
         try {
           await fbPromise;
-          setStatus('Facebook投稿完了 ✓', 'success');
+          setStatus(`Facebook投稿完了${await copySuffix()} ✓`, 'success');
         } catch (e) {
           setStatus(`Facebookエラー: ${e.message}`, 'error');
         }
@@ -534,10 +534,10 @@
           body: JSON.stringify({ video_id: videoId, message: caption }),
         });
         if (!res.ok) throw new Error((await res.json()).detail);
-        setStatus('Facebook投稿完了 & カメラロール保存済み ✓', 'success');
+        setStatus(`Facebook投稿完了 & カメラロール保存済み${await copySuffix()} ✓`, 'success');
       } catch (e) {
         if (e.message === 'Load failed' || e.message === 'Failed to fetch' || e.message === 'NetworkError') {
-          setStatus('Facebook投稿完了（Facebookで確認してください）', 'success');
+          setStatus(`Facebook投稿完了（Facebookで確認してください）${await copySuffix()}`, 'success');
         } else {
           setStatus(`Facebookエラー: ${e.message}`, 'error');
         }
@@ -549,42 +549,6 @@
 
   const DEFAULT_CAPTION = '\n\n#ダンス #ブレイクダンス #dance #breakdance ';
   document.getElementById('caption').value = DEFAULT_CAPTION;
-
-  const COPY_BTN_LABEL = document.getElementById('btn-copy-caption').textContent;
-  let _copyResetTimer = null;
-  function _execCommandCopy() {
-    const ta = document.getElementById('caption');
-    ta.select();
-    const ok = document.execCommand('copy');
-    ta.setSelectionRange(ta.value.length, ta.value.length);
-    ta.blur();
-    return ok;
-  }
-  async function copyCaption() {
-    const text = document.getElementById('caption').value;
-    const btn = document.getElementById('btn-copy-caption');
-    if (_copyResetTimer) { clearTimeout(_copyResetTimer); _copyResetTimer = null; }
-    btn.classList.remove('copied', 'failed');
-    let copied = false;
-    if (navigator.clipboard && window.isSecureContext) {
-      try { await navigator.clipboard.writeText(text); copied = true; } catch {}
-    }
-    if (!copied) {
-      try { copied = _execCommandCopy(); } catch {}
-    }
-    if (copied) {
-      btn.classList.add('copied');
-      btn.textContent = '✓ コピーしました';
-    } else {
-      btn.classList.add('failed');
-      btn.textContent = '✗ コピー失敗';
-    }
-    _copyResetTimer = setTimeout(() => {
-      btn.classList.remove('copied', 'failed');
-      btn.textContent = COPY_BTN_LABEL;
-      _copyResetTimer = null;
-    }, 1500);
-  }
 
   // ===== Hashtag chips =====
   function refreshChipStates() {
