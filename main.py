@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -19,9 +20,13 @@ async def lifespan(app: FastAPI):
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     # スリープからの起床ごとに、自動保守(コメント処理＋トークン更新チェック)を
     # バックグラウンドで1回だけキック。起動はブロックしない。GC回避のため参照保持。
-    from app.services.auto_maintenance import run_wake_maintenance
+    # 保守の import / 起動に失敗してもアプリ本体は必ず起動させる(保守はあくまでおまけ)。
+    try:
+        from app.services.auto_maintenance import run_wake_maintenance
 
-    app.state.maintenance_task = asyncio.create_task(run_wake_maintenance())
+        app.state.maintenance_task = asyncio.create_task(run_wake_maintenance())
+    except Exception:
+        logging.getLogger("reel_hub").exception("failed to schedule wake maintenance")
     yield
 
 
