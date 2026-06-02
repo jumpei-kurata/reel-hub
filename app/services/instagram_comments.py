@@ -30,7 +30,6 @@ _REPLY_PATTERNS = [
     "❤️‍🔥🔥",
     "🥹🔥",
 ]
-_TTL_SECONDS = 30 * 24 * 60 * 60  # 30日
 
 
 def _format_api_error(prefix: str, r: httpx.Response) -> str:
@@ -85,8 +84,8 @@ async def dedup_store_health() -> str:
 
 
 async def _load_processed(client: httpx.AsyncClient) -> dict:
-    """Upstash から処理済みID(TTL付き)を読む。読めなければ例外を投げ、
-    呼び出し側は再いいねによる toggle を避けるため処理を中止する。"""
+    """Upstash から処理済みIDを読む。読めなければ例外を投げ、呼び出し側は中止する。
+    TTLは設けない: 一度いいねしたコメントは永久に「処理済み」とし、二度と再いいね(toggle)しない。"""
     raw = await _upstash(client, "GET", _PROCESSED_KEY)
     if not raw:
         return {}
@@ -94,8 +93,7 @@ async def _load_processed(client: httpx.AsyncClient) -> dict:
     if not isinstance(data, dict):
         now = time.time()
         data = {k: now for k in data}
-    cutoff = time.time() - _TTL_SECONDS
-    return {k: v for k, v in data.items() if v > cutoff}
+    return data
 
 
 async def _save_processed(client: httpx.AsyncClient, ids: dict) -> None:
