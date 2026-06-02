@@ -13,17 +13,25 @@ async def ping():
 
 @router.get("/auth/status")
 async def auth_status():
-    # トークンの残り日数も返す(自動更新が効いているかの確認用)。失敗しても status は返す。
-    from app.services.auto_maintenance import token_days_remaining
+    # トークン残日数＋null の原因＋必要 env の設定有無を返す(自動保守の健康診断)。失敗しても status は返す。
+    from app.services.auto_maintenance import token_status
 
     try:
-        days = await token_days_remaining()
-    except Exception:
-        days = None
+        ts = await token_status()
+    except Exception as e:
+        ts = {"days": None, "reason": f"status error: {e}"}
     return {
         "facebook_configured": bool(os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")) and bool(os.getenv("FACEBOOK_PAGE_ID")),
         "instagram_configured": bool(os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")),
-        "token_days_remaining": round(days, 1) if days is not None else None,
+        "token_days_remaining": ts.get("days"),
+        "token_check": ts.get("reason"),
+        "config_present": {
+            "FACEBOOK_APP_ID": bool(os.getenv("FACEBOOK_APP_ID")),
+            "FACEBOOK_APP_SECRET": bool(os.getenv("FACEBOOK_APP_SECRET")),
+            "RENDER_API_KEY": bool(os.getenv("RENDER_API_KEY")),
+            "RENDER_SERVICE_ID": bool(os.getenv("RENDER_SERVICE_ID")),
+            "REFRESH_SECRET": bool(os.getenv("REFRESH_SECRET")),
+        },
     }
 
 

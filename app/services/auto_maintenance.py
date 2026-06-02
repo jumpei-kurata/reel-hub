@@ -33,10 +33,16 @@ _FB_BASE = "https://graph.facebook.com/v19.0"
 _REFRESH_THRESHOLD_DAYS = 25
 
 
-async def token_days_remaining() -> Optional[float]:
-    """現在の FB トークンの残り有効日数を返す。判定不能 / 無期限 なら None。"""
-    if not (FACEBOOK_APP_ID and FACEBOOK_APP_SECRET and FACEBOOK_PAGE_ACCESS_TOKEN):
-        return None
+async def token_status() -> dict:
+    """トークンの健康診断。{"days": Optional[float], "reason": str} を返す。
+    days が None のとき reason に原因が入る(診断用)。"""
+    if not FACEBOOK_PAGE_ACCESS_TOKEN:
+        return {"days": None, "reason": "FACEBOOK_PAGE_ACCESS_TOKEN 未設定"}
+    if not (FACEBOOK_APP_ID and FACEBOOK_APP_SECRET):
+        return {
+            "days": None,
+            "reason": "FACEBOOK_APP_ID / FACEBOOK_APP_SECRET 未設定(サーバー側) → 残日数取得も自動更新も不可",
+        }
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.get(
@@ -46,14 +52,26 @@ async def token_days_remaining() -> Optional[float]:
                     "access_token": f"{FACEBOOK_APP_ID}|{FACEBOOK_APP_SECRET}",
                 },
             )
-            data = (r.json() or {}).get("data", {})
+            body = r.json() if r.content else {}
     except Exception as e:  # ネットワーク/JSON 失敗は致命ではない
         logger.warning("debug_token check failed: %s", e)
-        return None
+        return {"days": None, "reason": f"debug_token リクエスト失敗: {e}"}
+    if isinstance(body, dict) and body.get("error"):
+        return {"days": None, "reason": f"debug_token エラー: {body['error'].get('message')}"}
+    data = body.get("data", {}) if isinstance(body, dict) else {}
     expires_at = data.get("expires_at")
-    if not expires_at:  # 0 = 無期限、または欠落 → 更新不要 / 判定不能
-        return None
-    return (expires_at - time.time()) / 86400.0
+    is_valid = data.get("is_valid")
+    if expires_at == 0:
+        return {"days": None, "reason": "無期限トークン(更新不要・切れない)"}
+    if not expires_at:
+        return {"days": None, "reason": f"debug_token に expires_at 無し (is_valid={is_valid})"}
+    days = round((expires_at - time.time()) / 86400.0, 1)
+    return {"days": days, "reason": "ok" if is_valid else f"トークン無効 (is_valid={is_valid})"}
+
+
+async def token_days_remaining() -> Optional[float]:
+    """残り有効日数。判定不能 / 無期限 なら None。"""
+    return (await token_status()).get("days")
 
 
 async def maybe_refresh_token() -> None:
