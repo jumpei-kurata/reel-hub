@@ -1,7 +1,10 @@
 import os
+import secrets
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, PlainTextResponse
+
+from app.config import REFRESH_SECRET
 
 router = APIRouter()
 
@@ -12,27 +15,30 @@ async def ping():
 
 
 @router.get("/auth/status")
-async def auth_status():
-    # トークン残日数＋null の原因＋必要 env の設定有無を返す(自動保守の健康診断)。失敗しても status は返す。
-    from app.services.auto_maintenance import token_status
-
-    try:
-        ts = await token_status()
-    except Exception as e:
-        ts = {"days": None, "reason": f"status error: {e}"}
-    return {
+async def auth_status(secret: str = ""):
+    # 公開は基本ブールのみ。詳細診断(残日数・null理由・必要envの設定状況)は
+    # 認証情報の設定状況を無認証で列挙させないため ?secret= 必須。
+    result = {
         "facebook_configured": bool(os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")) and bool(os.getenv("FACEBOOK_PAGE_ID")),
         "instagram_configured": bool(os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")),
-        "token_days_remaining": ts.get("days"),
-        "token_check": ts.get("reason"),
-        "config_present": {
+    }
+    if REFRESH_SECRET and secret and secrets.compare_digest(secret, REFRESH_SECRET):
+        from app.services.auto_maintenance import token_status
+
+        try:
+            ts = await token_status()
+        except Exception as e:
+            ts = {"days": None, "reason": f"status error: {e}"}
+        result["token_days_remaining"] = ts.get("days")
+        result["token_check"] = ts.get("reason")
+        result["config_present"] = {
             "FACEBOOK_APP_ID": bool(os.getenv("FACEBOOK_APP_ID")),
             "FACEBOOK_APP_SECRET": bool(os.getenv("FACEBOOK_APP_SECRET")),
             "RENDER_API_KEY": bool(os.getenv("RENDER_API_KEY")),
             "RENDER_SERVICE_ID": bool(os.getenv("RENDER_SERVICE_ID")),
             "REFRESH_SECRET": bool(os.getenv("REFRESH_SECRET")),
-        },
-    }
+        }
+    return result
 
 
 _TERMS_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>利用規約 - Reel Hub</title>

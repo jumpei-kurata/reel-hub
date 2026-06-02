@@ -325,6 +325,8 @@ https://graph.facebook.com/v19.0/me/accounts?fields=id,name&access_token={長期
 
 長期ユーザートークンは60日で失効する。**起床時の自動保守**がこれを自動更新するため、手動運用も外部cronも不要。
 
+> **※ 現在の本番トークンは無期限型**（`debug_token` の `expires_at=0`。`/auth/status?secret={REFRESH_SECRET}` で確認可）。そのため実際には更新は発火しない（そもそも切れない）。下記の仕組みは**将来60日型トークンに差し替えた場合の安全網**として残してある。
+
 ### 仕組み
 
 ```
