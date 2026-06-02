@@ -1,0 +1,33 @@
+name: reel-hub wake (unattended comment processing)
+
+# スリープ中の reel-hub を定期的に起こす。起床すると main.py の lifespan が
+# 自動保守(コメント処理 + トークンチェック)をバックグラウンド実行する。
+# コメント処理は Upstash の永続dedupを使うので再いいね(toggle)しない。
+#
+# Render無料枠の起床は flaky(hibernate-wake-error)なのでリトライする。
+# 3時間ごと × 1回あたり ~15分稼働 ≈ 月60-70時間(750h上限に十分な余裕)。
+# 頻度を上げたいなら cron を "*/2" や "0 * * * *" に。
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"   # 3時間ごと (UTC, :17 で GitHub の混雑時刻を回避)
+  workflow_dispatch: {}       # 手動実行ボタン
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake reel-hub (retry through flaky hibernation-wake)
+        run: |
+          URL="https://reel-hub.onrender.com/ping"
+          for i in $(seq 1 6); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$URL" || echo "000")
+            echo "attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "woke OK on attempt $i"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::warning::failed to wake reel-hub after 6 attempts (will retry next schedule)"
+          exit 1

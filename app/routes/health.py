@@ -37,7 +37,15 @@ async def auth_status(secret: str = ""):
             "RENDER_API_KEY": bool(os.getenv("RENDER_API_KEY")),
             "RENDER_SERVICE_ID": bool(os.getenv("RENDER_SERVICE_ID")),
             "REFRESH_SECRET": bool(os.getenv("REFRESH_SECRET")),
+            "UPSTASH_REDIS_REST_URL": bool(os.getenv("UPSTASH_REDIS_REST_URL")),
+            "UPSTASH_REDIS_REST_TOKEN": bool(os.getenv("UPSTASH_REDIS_REST_TOKEN")),
         }
+        from app.services.instagram_comments import dedup_store_health
+
+        try:
+            result["dedup_store"] = await dedup_store_health()
+        except Exception as e:
+            result["dedup_store"] = f"error: {e}"
     return result
 
 
