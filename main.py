@@ -1,3 +1,4 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,11 @@ from app.config import DOWNLOAD_DIR
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    # スリープからの起床ごとに、自動保守(コメント処理＋トークン更新チェック)を
+    # バックグラウンドで1回だけキック。起動はブロックしない。GC回避のため参照保持。
+    from app.services.auto_maintenance import run_wake_maintenance
+
+    app.state.maintenance_task = asyncio.create_task(run_wake_maintenance())
     yield
 
 

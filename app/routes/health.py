@@ -13,9 +13,17 @@ async def ping():
 
 @router.get("/auth/status")
 async def auth_status():
+    # トークンの残り日数も返す(自動更新が効いているかの確認用)。失敗しても status は返す。
+    from app.services.auto_maintenance import token_days_remaining
+
+    try:
+        days = await token_days_remaining()
+    except Exception:
+        days = None
     return {
         "facebook_configured": bool(os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")) and bool(os.getenv("FACEBOOK_PAGE_ID")),
         "instagram_configured": bool(os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")),
+        "token_days_remaining": round(days, 1) if days is not None else None,
     }
 
 
