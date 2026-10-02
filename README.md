@@ -4,7 +4,7 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 
 ## 機能
 
-- Instagram URLから動画をダウンロード → Facebookに投稿 & カメラロールに保存
+- Instagram URLから動画をダウンロード（自分の投稿のみ）→ Facebookに投稿 & カメラロールに保存
 - ローカル動画ファイルをアップロード → Facebook & Instagramに自動投稿
 - キャプション・ハッシュタグ編集UI：4つの固定タグ事前入力 + 可変5つ目をチップタップで追加/削除
 - コメント自動いいね（他人のコメント＋返信、2階層）＋ 絵文字オンリーコメントへの13パターン絵文字ランダム返信
@@ -15,7 +15,7 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 
 | 機能 | 状態 |
 |------|------|
-| Instagram URLダウンロード | ✅ 動作中 |
+| Instagram URLダウンロード | ✅ 自分の投稿は動作中（Graph API 経由）・他人の投稿は ❌（2026-10 時点で Instagram がログインなしの取得を停止） |
 | Facebook自動投稿（URL/アップロード両対応） | ✅ 動作中 |
 | カメラロール保存（iOS Web Share API） | ✅ 動作中 |
 | Instagramへの自動投稿（アップロード時） | ⚠️ コード実装済み・H.264動画のみ対応（後述） |
@@ -49,7 +49,7 @@ Instagramの動画をダウンロードして、Facebookページ・Instagramに
 | 項目 | 内容 |
 |------|------|
 | バックエンド | FastAPI + Python |
-| 動画DL | yt-dlp |
+| 動画DL | 自分の投稿＝Graph API の `media_url`（`app/services/instagram_media.py`）／それ以外＝yt-dlp |
 | ホスティング | Render 無料枠（スリープ運用・常時起動しない。初回アクセスは~60秒のコールドスタート） |
 | 定期起こし | **GitHub Actions**（`.github/workflows/reel-hub-wake.yml`）が3hごとに `/ping` で起こす。月~70h（750h上限内） |
 | 自動保守 | 起床ごとに `main.py` lifespan がコメント処理＋トークンチェックを実行 |
@@ -456,6 +456,7 @@ TikTokのURL認証ファイルや利用規約・プライバシーポリシー�
 ## 注意事項
 
 - Renderの無料枠は**永続保証なし**（現時点で750時間/月）
-- yt-dlpはInstagramの公開投稿のみ対応（非公開投稿はクッキー認証が別途必要）
+- Instagram の URL ダウンロードは**自分の投稿のみ**（Graph API で直近2,000投稿から shortcode を探し、`media_url` を受け取る）。他人の投稿は yt-dlp に回すが、2026-10 時点で Instagram がログインなしの取得を止めており、最新の yt-dlp でも取れない（ログイン済みクッキーが要る＝サーバーから使うとアカウントロックの危険があるため未対応）
+- 音源の著作権などで `media_url` が返らない投稿は、カメラロールの元動画をアップロードする
 - このツールは自分のコンテンツの再投稿を目的としたプライベート利用のみ
 - GitHubリポジトリはPublic（`.env` はgitignore済みなので認証情報は含まれない）
