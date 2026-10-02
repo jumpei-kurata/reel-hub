@@ -7,7 +7,7 @@ import httpx
 from app.config import FACEBOOK_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID
 
 _GRAPH_BASE = "https://graph.facebook.com/v19.0"
-_FIELDS = "id,shortcode,media_type,media_url,permalink,caption,thumbnail_url"
+_FIELDS = "id,shortcode,media_type,media_url,permalink,caption,thumbnail_url,timestamp,username"
 _SHORTCODE_RE = re.compile(r"instagram\.com/(?:[^/?#]+/)?(?:p|reels?|tv)/([A-Za-z0-9_-]+)")
 # 100件 × 20ページ = 直近2,000投稿まで遡る
 _MAX_PAGES = 20
@@ -18,17 +18,25 @@ def extract_shortcode(url: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+class OwnMediaNotFound(Exception):
+    """自分の投稿に見つからなかった。メッセージに探した範囲を入れる。"""
+
+
 async def find_own_media(shortcode: str) -> Optional[dict]:
     """自分の IG ビジネスアカウントの投稿から shortcode が一致するものを探す。
 
     Instagram はログインなしの取得(yt-dlp)を止めているため、自分の投稿は
-    Graph API の media_url から直接受け取る。見つからなければ None。
+    Graph API の media_url から直接受け取る。設定が無ければ None、
+    探して見つからなければ OwnMediaNotFound。
     """
     if not FACEBOOK_PAGE_ACCESS_TOKEN or not INSTAGRAM_BUSINESS_ACCOUNT_ID:
         return None
 
     url = f"{_GRAPH_BASE}/{INSTAGRAM_BUSINESS_ACCOUNT_ID}/media"
     params: Optional[dict] = {"fields": _FIELDS, "limit": 100, "access_token": FACEBOOK_PAGE_ACCESS_TOKEN}
+    scanned = 0
+    username = ""
+    oldest = ""
     async with httpx.AsyncClient(timeout=30.0) as client:
         for _ in range(_MAX_PAGES):
             data = (await client.get(url, params=params)).json()
@@ -38,12 +46,15 @@ async def find_own_media(shortcode: str) -> Optional[dict]:
             for media in data.get("data", []):
                 if media.get("shortcode") == shortcode or f"/{shortcode}/" in (media.get("permalink") or ""):
                     return media
+                scanned += 1
+                username = username or media.get("username", "")
+                oldest = (media.get("timestamp") or oldest)[:10]
             # paging.next には access_token 込みのクエリが入っている
             url = (data.get("paging") or {}).get("next")
             if not url:
-                return None
+                break
             params = None
-    return None
+    raise OwnMediaNotFound(f"@{username} の投稿 {scanned} 件（{oldest} まで）に見つかりませんでした")
 
 
 async def download_own_media(media: dict, output_dir: str) -> dict:

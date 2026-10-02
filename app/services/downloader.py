@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import yt_dlp
 
 from app.config import DOWNLOAD_DIR
-from app.services.instagram_media import download_own_media, extract_shortcode, find_own_media
+from app.services.instagram_media import OwnMediaNotFound, download_own_media, extract_shortcode, find_own_media
 
 _executor = ThreadPoolExecutor(max_workers=2)
 
@@ -36,8 +36,10 @@ async def download_video(url: str) -> dict:
     if shortcode:
         try:
             media = await find_own_media(shortcode)
-        except Exception as e:
+        except OwnMediaNotFound as e:
             own_error = str(e)
+        except Exception as e:
+            own_error = f"自分の投稿の検索でエラー: {e}"
     if media:
         info = await download_own_media(media, output_dir)
     else:
@@ -47,7 +49,7 @@ async def download_video(url: str) -> dict:
         except Exception as e:
             if not shortcode:
                 raise
-            reason = f"自分の投稿の検索でエラー: {own_error}" if own_error else "自分のアカウントの投稿に見つかりませんでした"
+            reason = own_error or "自分の投稿を探す設定がありません"
             raise RuntimeError(f"取れませんでした（{reason}）。他人の投稿は Instagram がログインなしの取得を止めています") from e
 
     files = glob.glob(os.path.join(output_dir, "*"))
