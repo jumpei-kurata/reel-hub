@@ -62,6 +62,9 @@
     .btn:disabled { opacity: 0.35; cursor: default; }
     .btn-primary { background: var(--primary); color: #fff; margin-top: 12px; }
     .btn-post { background: #1877f2; color: #fff; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 12px; text-decoration: none; }
+    .help { font-size: 13px; color: var(--sub); line-height: 1.6; margin-top: 10px; }
+    ol.help { padding-left: 20px; }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
     .divider { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; color: var(--sub); font-size: 12px; }
     .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -183,6 +186,18 @@
     <input type="url" id="url" placeholder="https://www.instagram.com/reel/..."
       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
     <button class="btn btn-primary" id="btn-dl" onclick="startDownload()">ダウンロード</button>
+    <!-- Instagram が動画ファイルを渡さない投稿 (曲付き・他人の投稿) で出す。外部の保存サイトを、URL をコピーした上で開く。
+         サイトの入力欄に URL が入って開くかはサイト次第 (?link= を付けて開く・入っていなければ「貼り付け」1回)。
+         サーバーから外部サイトを自動で操作はしない (ロボット判定の回避になるため) -->
+    <div id="manual-help" class="hidden">
+      <a class="btn btn-ghost" id="btn-indown" href="https://indown.io/reels/ja2" target="_blank" rel="noopener noreferrer"
+         onclick="copyUrlForManual()">indown.io で取る</a>
+      <ol class="help">
+        <li>押すと URL をコピーして indown.io が開きます。URL が入っていなければ「貼り付け」→「ダウンロード」</li>
+        <li>ここに戻って、下の「動画ファイルをアップロード」から選ぶ（iPhone は「ファイル」→「ダウンロード」の中）</li>
+      </ol>
+      <p class="help">曲なしでよければ、Instagram アプリでリールの「…」→「ダウンロード」でも保存できます（Instagram の音楽ライブラリの曲は外れます。透かしが入る場合があります）。</p>
+    </div>
   </div>
 
   <div class="divider">または</div>
@@ -392,10 +407,24 @@
     el.innerHTML = type === 'loading' ? `<span class="spin"></span>${msg}` : msg;
   }
 
+  // 手で保存する手順を出す (サーバーが detail に {message, manual:true} を返した時)
+  function showManualHelp(url) {
+    document.getElementById('btn-indown').href =
+      'https://indown.io/reels/ja2?link=' + encodeURIComponent(url);
+    document.getElementById('manual-help').classList.remove('hidden');
+  }
+  // リンクの移動そのものは <a> に任せる (window.open だとポップアップとして止められることがある)。
+  // コピーは押した瞬間に始める (ユーザーの操作の中でないと iPhone の Safari が書き込ませない)
+  function copyUrlForManual() {
+    const u = document.getElementById('url').value.trim();
+    if (u && navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(u).catch(() => {});
+  }
+
   async function startDownload() {
     const url = document.getElementById('url').value.trim();
     if (!url) { setStatus('URLを入力してください', 'error'); return; }
     document.getElementById('btn-dl').disabled = true;
+    document.getElementById('manual-help').classList.add('hidden');
     setStatus('ダウンロード中...', 'loading');
     try {
       const res = await fetch('/api/download', {
@@ -403,7 +432,14 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
-      if (!res.ok) throw new Error((await res.json()).detail);
+      if (!res.ok) {
+        const detail = (await res.json()).detail;
+        if (detail && typeof detail === 'object') {
+          if (detail.manual) showManualHelp(url);
+          throw new Error(detail.message || 'ダウンロードに失敗しました');
+        }
+        throw new Error(detail);
+      }
       const data = await res.json();
       videoId = data.video_id;
       videoSource = 'download';

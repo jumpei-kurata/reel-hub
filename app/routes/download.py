@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.config import DOWNLOAD_DIR
 from app.services.downloader import download_video, get_video_path
+from app.services.instagram_media import ManualDownloadNeeded
 
 router = APIRouter()
 
@@ -23,6 +24,9 @@ class DownloadRequest(BaseModel):
 async def download(req: DownloadRequest):
     try:
         return await download_video(req.url)
+    except ManualDownloadNeeded as e:
+        # 画面はこれを見て「外部の保存サイトで取る」ボタンを出す (detail が文字列ではなく辞書)
+        raise HTTPException(status_code=400, detail={"message": str(e), "manual": True})
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -7,7 +7,13 @@ from concurrent.futures import ThreadPoolExecutor
 import yt_dlp
 
 from app.config import DOWNLOAD_DIR
-from app.services.instagram_media import OwnMediaNotFound, download_own_media, extract_shortcode, find_own_media
+from app.services.instagram_media import (
+    ManualDownloadNeeded,
+    OwnMediaNotFound,
+    download_own_media,
+    extract_shortcode,
+    find_own_media,
+)
 
 _executor = ThreadPoolExecutor(max_workers=2)
 
@@ -50,7 +56,10 @@ async def download_video(url: str) -> dict:
             if not shortcode:
                 raise
             reason = own_error or "自分の投稿を探す設定がありません"
-            raise RuntimeError(f"取れませんでした（{reason}）。他人の投稿は Instagram がログインなしの取得を止めています") from e
+            raise ManualDownloadNeeded(
+                f"取れませんでした（{reason}）。他人の投稿は Instagram がログインなしの取得を止めています。"
+                "下の「indown.io で取る」から保存して、アップロードしてください"
+            ) from e
 
     files = glob.glob(os.path.join(output_dir, "*"))
     if not files:

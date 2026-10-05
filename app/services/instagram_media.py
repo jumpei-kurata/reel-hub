@@ -22,6 +22,10 @@ class OwnMediaNotFound(Exception):
     """自分の投稿に見つからなかった。メッセージに探した範囲を入れる。"""
 
 
+class ManualDownloadNeeded(RuntimeError):
+    """Instagram から自動では取れない投稿。画面は手で保存する手順 (外部の保存サイトを開くボタン) を出す。"""
+
+
 async def find_own_media(shortcode: str) -> Optional[dict]:
     """自分の IG ビジネスアカウントの投稿から shortcode が一致するものを探す。
 
@@ -62,8 +66,12 @@ async def download_own_media(media: dict, output_dir: str) -> dict:
         raise RuntimeError("この投稿は動画ではありません（写真・複数枚の投稿には未対応です）")
     media_url = media.get("media_url")
     if not media_url:
-        # 音源の著作権などで Instagram が動画ファイルを渡さない投稿がある
-        raise RuntimeError("Instagram がこの投稿の動画ファイルを渡してくれませんでした。カメラロールの元動画をアップロードしてください")
+        # Graph API は、著作権のある音源 (Instagram の音楽ライブラリの曲を含む) が入った動画や著作権で
+        # flag された動画では、自分の投稿でも media_url を返さない (公式リファレンスの仕様)
+        raise ManualDownloadNeeded(
+            "この投稿は Instagram の音楽ライブラリの曲付きなどの理由で、Instagram が動画ファイルを渡しません"
+            "（自分の投稿でも同じ）。下の「indown.io で取る」から保存して、アップロードしてください"
+        )
 
     dest = os.path.join(output_dir, "video.mp4")
     async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
