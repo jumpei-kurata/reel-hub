@@ -65,6 +65,9 @@
     .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 12px; text-decoration: none; }
     .help { font-size: 13px; color: var(--sub); line-height: 1.6; margin-top: 10px; }
     ol.help { padding-left: 20px; }
+    label.ig-opt { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 500;
+      color: var(--text); text-transform: none; letter-spacing: 0; cursor: pointer; }
+    label.ig-opt input { width: 18px; height: 18px; accent-color: var(--primary); }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
     .divider { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; color: var(--sub); font-size: 12px; }
     .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -233,6 +236,13 @@
         <button class="chip" type="button" data-tag="bboy">#bboy</button>
       </div>
       <div class="actions">
+        <!-- 投稿先は Facebook だけが既定 (2026-10-06)。アップロード欄には Instagram から保存した動画
+             (indown.io・Instagram アプリの保存) も来るので、自動で Instagram にも出すと二重投稿になる。
+             Instagram に無い新しい動画のときだけ、毎回自分でチェックする (チェックは覚えない) -->
+        <label class="ig-opt hidden" id="ig-opt">
+          <input type="checkbox" id="ig-also" onchange="updatePostButton()">
+          Instagram にも投稿する（Instagram に無い新しい動画のときだけ）
+        </label>
         <button class="btn btn-post" id="btn-post" onclick="postAndSave()">
           FB投稿 + カメラロール保存 + キャプションコピー
         </button>
@@ -387,14 +397,20 @@
     } catch {}
   }
 
+  // Instagram にも出すのは「アップロード + Instagram 設定済み + 自分でチェックした」時だけ
+  function postToInstagram() {
+    return videoSource === 'upload' && instagramConfigured && document.getElementById('ig-also').checked;
+  }
+
   function updatePostButton() {
     const btn = document.getElementById('btn-post');
     const hint = document.getElementById('post-hint');
+    document.getElementById('ig-opt').classList.toggle('hidden', !(videoSource === 'upload' && instagramConfigured));
     if (videoSource === 'upload') {
-      btn.textContent = instagramConfigured
+      btn.textContent = postToInstagram()
         ? 'FB+IG投稿 + キャプションコピー'
         : 'FB投稿 + キャプションコピー';
-      hint.textContent = instagramConfigured ? '' : '※ Instagram未設定（INSTAGRAM_BUSINESS_ACCOUNT_IDが必要）';
+      hint.textContent = '';
     } else {
       btn.textContent = 'FB投稿 + カメラロール保存 + キャプションコピー';
       hint.textContent = '共有シートが開いたら「ビデオを保存」をタップ';
@@ -443,6 +459,7 @@
       const data = await res.json();
       videoId = data.video_id;
       videoSource = 'download';
+      document.getElementById('ig-also').checked = false;
       document.getElementById('preview').src = `/api/video/${videoId}`;
       document.getElementById('section-result').classList.remove('hidden');
       document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
@@ -473,6 +490,7 @@
       const data = await res.json();
       videoId = data.video_id;
       videoSource = 'upload';
+      document.getElementById('ig-also').checked = false;   // 動画ごとに外す (前の動画のチェックを引き継がない)
       document.getElementById('preview').src = `/api/video/${videoId}`;
       document.getElementById('section-result').classList.remove('hidden');
       document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
@@ -507,7 +525,7 @@
         body: JSON.stringify({ video_id: videoId, message: caption }),
       }).then(async r => { if (!r.ok) throw new Error((await r.json()).detail); return r.json(); });
 
-      if (instagramConfigured) {
+      if (postToInstagram()) {
         const igPromise = fetch('/api/instagram/post', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -528,7 +546,7 @@
           setStatus(`Facebookエラー: ${fbResult.reason.message}`, 'error');
         }
       } else {
-        // Instagram未設定: Facebookのみ
+        // 既定: Facebook のみ (Instagram にもチェックしていない・または Instagram 未設定)
         try {
           await fbPromise;
           setStatus(`Facebook投稿完了${await copySuffix()} ✓`, 'success');
